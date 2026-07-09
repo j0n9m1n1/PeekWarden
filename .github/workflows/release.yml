@@ -58,8 +58,8 @@ jobs:
           $cmakeArgs = @(
             "-S", ".",
             "-B", "build",
-            "-G", "Visual Studio 17 2022",
-            "-A", "x64",
+            "-G", "Ninja",
+            "-DCMAKE_BUILD_TYPE=Release",
             "-DCMAKE_PREFIX_PATH=$qtPrefix"
           )
 
@@ -75,7 +75,7 @@ jobs:
           }
 
       - name: Build
-        run: cmake --build build --config Release --parallel
+        run: cmake --build build --parallel
 
       - name: Package
         shell: pwsh
@@ -83,15 +83,27 @@ jobs:
           $version = if ("${{ github.ref_type }}" -eq "tag") { "${{ github.ref_name }}" } else { "manual" }
           $stage = Join-Path $PWD "dist\${{ env.APP_NAME }}-$version-win64"
           $zip = "$stage.zip"
-          $exe = Join-Path $PWD "build\Release\${{ env.APP_NAME }}.exe"
-          $translations = Join-Path $PWD "build\Release\translations"
+          $exeCandidates = @(
+            (Join-Path $PWD "build\Release\${{ env.APP_NAME }}.exe"),
+            (Join-Path $PWD "build\${{ env.APP_NAME }}.exe")
+          )
+          $translationsCandidates = @(
+            (Join-Path $PWD "build\Release\translations"),
+            (Join-Path $PWD "build\translations")
+          )
+          $exe = $exeCandidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+          $translations = $translationsCandidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+
+          if (-not $exe) {
+            throw "Built executable was not found."
+          }
 
           New-Item -ItemType Directory -Force -Path $stage | Out-Null
           Copy-Item -LiteralPath $exe -Destination $stage
           Copy-Item -LiteralPath LICENSE -Destination $stage
           Copy-Item -LiteralPath README.md -Destination $stage
 
-          if (Test-Path -LiteralPath $translations) {
+          if ($translations) {
             Copy-Item -LiteralPath $translations -Destination $stage -Recurse
           }
 
