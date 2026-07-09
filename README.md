@@ -46,6 +46,21 @@ not found there, it falls back to `bw` from `PATH`.
 Bitwarden CLI download and setup:
 https://bitwarden.com/help/cli/
 
+## Project Structure
+
+- `src/main.cpp` - Application startup, tray setup, and quick window wiring.
+- `src/QuickWindow.*` - Quick-access search window, login/unlock UI, result
+  list, copy actions, detail view, and favicon loading.
+- `src/BwClient.*` - Bitwarden CLI wrapper for status, login, unlock, sync,
+  item retrieval, sensitive field lookup, and session handling.
+- `src/AppSettings.*` - Persistent settings for hotkeys, UI options, language,
+  sync interval, result display, and session storage preferences.
+- `src/SettingsDialog.*` - Settings dialog UI and validation.
+- `src/WinHotkey.*` - Windows global hotkey registration.
+- `src/I18n.*` and `src/TranslationCatalog.cpp` - Runtime text lookup and
+  built-in translations.
+- `translations/` - Qt translation source files and translation notes.
+
 ## Build
 
 Install Qt and the Bitwarden CLI first.
@@ -112,6 +127,8 @@ Esc             Close
 - Multi-account support is not implemented yet.
 - The app depends on the Bitwarden CLI being installed and logged in/unlocked.
 - Vault items are cached in memory for fast searching.
+- YubiKey, passkey, and other hardware security key authentication flows have
+  not been tested yet.
 
 ## Status
 
