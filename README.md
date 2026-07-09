@@ -29,7 +29,7 @@ This project is early Windows-first software.
 - Optional web favicon loading for search results.
 - System tray menu with open, lock, settings, and quit.
 - Settings action to log out of Bitwarden and clear the stored PeekWarden session.
-- Configurable hotkey, shortcut preset, quick window size, position, opacity, corner style, background color, font, language, result fields, result count, auto-sync interval, and focus-loss behavior.
+- Configurable hotkey, shortcut preset, quick window size, position, opacity, corner style, theme, font, language, result fields, result count, auto-sync interval, and focus-loss behavior.
 - Optional Windows Credential Manager session storage.
 - Optional Windows startup registration without administrator rights.
 
@@ -89,14 +89,14 @@ needed.
 GitHub Actions builds a Windows release package when a version tag is pushed:
 
 ```powershell
-git tag v0.1.0
-git push origin v0.1.0
+git tag v0.1.1
+git push origin v0.1.1
 ```
 
 The workflow creates a `PeekWarden-<tag>-win64.zip` package with `PeekWarden.exe`,
 Qt runtime DLLs from `windeployqt`, translations, `README.md`, and `LICENSE`, then
 attaches it to the GitHub Release. It can also be run manually from the Actions
-tab.
+tab. Use a new version tag for each release.
 
 ## Usage
 

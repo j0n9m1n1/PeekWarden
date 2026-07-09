@@ -6,7 +6,7 @@ on:
       qt_version:
         description: Qt version to build with
         required: true
-        default: 6.11.1
+        default: 6.8.3
   push:
     tags:
       - "v*"
@@ -16,7 +16,7 @@ permissions:
 
 env:
   APP_NAME: PeekWarden
-  QT_VERSION: ${{ github.event.inputs.qt_version || '6.11.1' }}
+  QT_VERSION: ${{ github.event.inputs.qt_version || '6.8.3' }}
 
 jobs:
   windows:
