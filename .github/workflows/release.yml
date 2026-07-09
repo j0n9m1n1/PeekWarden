@@ -36,11 +36,23 @@ jobs:
           arch: win64_msvc2022_64
           cache: true
 
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+
       - name: Configure
         shell: pwsh
         run: |
-          $qmake = (Get-Command qmake.exe).Source
-          $qtPrefix = Split-Path -Parent (Split-Path -Parent $qmake)
+          $qtPrefix = $env:QT_ROOT_DIR
+
+          if (-not $qtPrefix -and $env:Qt6_DIR) {
+            $qtPrefix = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $env:Qt6_DIR))
+          }
+
+          if (-not $qtPrefix) {
+            throw "Qt install path was not exported by install-qt-action."
+          }
+
+          Write-Host "Using Qt prefix: $qtPrefix"
 
           cmake `
             -S . `
