@@ -35,6 +35,7 @@ public:
     void showQuick();
     void showSettings();
     bool lockVault(QString* errorMessage = nullptr);
+    bool logoutVault(QString* errorMessage = nullptr);
     void applySettings();
     void setSettingsChangedCallback(std::function<void()> callback);
 

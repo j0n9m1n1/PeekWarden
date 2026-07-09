@@ -25,6 +25,7 @@
 #include <QLineEdit>
 #include <QListWidget>
 #include <QMenu>
+#include <QMessageBox>
 #include <QMessageAuthenticationCode>
 #include <QMouseEvent>
 #include <QNetworkAccessManager>
@@ -1206,6 +1207,40 @@ bool QuickWindow::lockVault(QString* errorMessage)
     return locked;
 }
 
+bool QuickWindow::logoutVault(QString* errorMessage)
+{
+    const bool loggedOut = m_bw.logout(errorMessage);
+    m_refreshTimer.stop();
+    m_itemsReady = false;
+    m_cachedItems.clear();
+    m_faviconCache.clear();
+    m_pendingFavicons.clear();
+    m_queuedSearchText.clear();
+    m_recentItemIds.clear();
+    m_currentUserEmail.clear();
+    m_currentServerUrl.clear();
+    m_list->clear();
+    m_list->setVisible(false);
+    m_search->clear();
+    m_authEmail->clear();
+    hideAuthPanel();
+    setBusy(false);
+    setStatus({});
+    updateFooter();
+
+    if (loggedOut) {
+        applySettings();
+        showAuthPanel(AuthMode::Login);
+        moveToConfiguredPosition();
+        show();
+        raise();
+        activateWindow();
+        m_authEmail->setFocus();
+    }
+
+    return loggedOut;
+}
+
 void QuickWindow::preloadVault()
 {
     if (m_authMode != AuthMode::None || m_itemsReady
@@ -1281,6 +1316,17 @@ void QuickWindow::openSettings()
     SettingsDialog dialog(this);
     if (dialog.exec() != QDialog::Accepted)
         return;
+
+    if (dialog.logoutRequested()) {
+        QString errorMessage;
+        if (!logoutVault(&errorMessage) && !errorMessage.isEmpty()) {
+            QMessageBox::warning(
+                this,
+                uiText("Bitwarden 로그아웃", "Bitwarden Logout"),
+                errorMessage);
+        }
+        return;
+    }
 
     if (m_settingsChanged)
         m_settingsChanged();

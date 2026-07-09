@@ -699,6 +699,28 @@ bool BwClient::lock(QString* errorMessage)
     deleteStoredSession();
 
     if (!result.ok()) {
+        QString ignoredError;
+        if (statusInfo(&ignoredError).status == VaultStatus::Unauthenticated) {
+            setError(errorMessage, {});
+            return true;
+        }
+
+        setError(errorMessage, describeCommandError(m_program, arguments, result));
+        return false;
+    }
+
+    setError(errorMessage, {});
+    return true;
+}
+
+bool BwClient::logout(QString* errorMessage)
+{
+    const QStringList arguments = {"logout", "--nointeraction"};
+    const CommandResult result = run(arguments);
+    m_session.clear();
+    deleteStoredSession();
+
+    if (!result.ok()) {
         setError(errorMessage, describeCommandError(m_program, arguments, result));
         return false;
     }

@@ -16,10 +16,12 @@ class SettingsDialog : public QDialog
 {
 public:
     explicit SettingsDialog(QWidget* parent = nullptr);
+    bool logoutRequested() const;
 
 private:
     void chooseBwProgram();
     void chooseBackgroundColor();
+    void requestLogout();
     void saveAndAccept();
     void updateBackgroundColorButton();
     void updateOpacityLabel();
@@ -54,5 +56,7 @@ private:
     QCheckBox* m_closeOnFocusLossCheck = nullptr;
     QCheckBox* m_credentialSessionStorageCheck = nullptr;
     QCheckBox* m_startOnLoginCheck = nullptr;
+    QPushButton* m_logoutButton = nullptr;
     QLineEdit* m_bwPathEdit = nullptr;
+    bool m_logoutRequested = false;
 };

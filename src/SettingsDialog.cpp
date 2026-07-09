@@ -226,6 +226,12 @@ SettingsDialog::SettingsDialog(QWidget* parent)
     m_startOnLoginCheck = new QCheckBox(uiText("Start with Windows", "Windows 자동 시작"), this);
     m_startOnLoginCheck->setChecked(AppSettings::startOnLoginEnabled());
 
+    m_logoutButton = new QPushButton(uiText("Log out of Bitwarden...", "Bitwarden 로그아웃..."), this);
+    m_logoutButton->setObjectName("dangerButton");
+    m_logoutButton->setToolTip(
+        uiText("Run bw logout and remove the stored PeekWarden session.",
+               "bw logout을 실행하고 저장된 PeekWarden 세션을 제거합니다."));
+
     m_bwPathEdit = new QLineEdit(AppSettings::bwProgramOverride(), this);
     m_bwPathEdit->setMinimumWidth(120);
     m_bwPathEdit->setPlaceholderText(
@@ -280,6 +286,7 @@ SettingsDialog::SettingsDialog(QWidget* parent)
     securityLayout->setSpacing(4);
     securityLayout->addWidget(m_credentialSessionStorageCheck);
     securityLayout->addWidget(m_startOnLoginCheck);
+    securityLayout->addWidget(m_logoutButton);
 
     auto* form = new QFormLayout;
     form->setLabelAlignment(Qt::AlignRight);
@@ -407,6 +414,13 @@ SettingsDialog::SettingsDialog(QWidget* parent)
         QPushButton:pressed {
             background: #4d4456;
         }
+        #dangerButton {
+            background: #6d2a3a;
+            border-color: #95576a;
+        }
+        #dangerButton:hover {
+            background: #7f3447;
+        }
     )");
 
     connect(m_opacitySlider, &QSlider::valueChanged, this, [this] {
@@ -450,6 +464,10 @@ SettingsDialog::SettingsDialog(QWidget* parent)
         m_bwPathEdit->clear();
     });
 
+    connect(m_logoutButton, &QPushButton::clicked, this, [this] {
+        requestLogout();
+    });
+
     connect(buttons, &QDialogButtonBox::accepted, this, [this] {
         saveAndAccept();
     });
@@ -459,6 +477,11 @@ SettingsDialog::SettingsDialog(QWidget* parent)
     });
 
     updateShortcutGuide();
+}
+
+bool SettingsDialog::logoutRequested() const
+{
+    return m_logoutRequested;
 }
 
 void SettingsDialog::chooseBwProgram()
@@ -482,6 +505,23 @@ void SettingsDialog::chooseBackgroundColor()
 
     m_backgroundColorButton->setProperty("selectedColor", selected.name(QColor::HexRgb));
     updateBackgroundColorButton();
+}
+
+void SettingsDialog::requestLogout()
+{
+    const QMessageBox::StandardButton answer = QMessageBox::question(
+        this,
+        uiText("Log out of Bitwarden", "Bitwarden 로그아웃"),
+        uiText("This will run bw logout, clear cached vault data, and remove the stored PeekWarden session. Continue?",
+               "bw logout을 실행하고, 캐시된 보관함 데이터를 비우고, 저장된 PeekWarden 세션을 제거합니다. 계속할까요?"),
+        QMessageBox::Yes | QMessageBox::Cancel,
+        QMessageBox::Cancel);
+
+    if (answer != QMessageBox::Yes)
+        return;
+
+    m_logoutRequested = true;
+    accept();
 }
 
 void SettingsDialog::saveAndAccept()

@@ -86,6 +86,7 @@ public:
         QString* errorMessage = nullptr);
     bool unlockWithPassword(const QString& password, QString* errorMessage = nullptr);
     bool lock(QString* errorMessage = nullptr);
+    bool logout(QString* errorMessage = nullptr);
     bool sync(QString* errorMessage = nullptr) const;
 
     QVector<VaultItem> listItems(QString* errorMessage = nullptr) const;

@@ -28,9 +28,20 @@ This project is early Windows-first software.
 - Item detail window with redacted raw JSON, clickable website links, notes, and metadata.
 - Optional web favicon loading for search results.
 - System tray menu with open, lock, settings, and quit.
+- Settings action to log out of Bitwarden and clear the stored PeekWarden session.
 - Configurable hotkey, shortcut preset, quick window size, position, opacity, corner style, background color, font, language, result fields, result count, auto-sync interval, and focus-loss behavior.
 - Optional Windows Credential Manager session storage.
 - Optional Windows startup registration without administrator rights.
+
+## Screenshots
+
+| Login | Quick access |
+| --- | --- |
+| <img src="login.png" alt="Bitwarden login screen" width="420"> | <img src="search.png" alt="Quick access search window" width="420"> |
+
+| Search results | Settings |
+| --- | --- |
+| <img src="result.png" alt="Search results" width="420"> | <img src="setting.png" alt="Settings dialog" width="420"> |
 
 ## Requirements
 
@@ -119,6 +130,8 @@ Esc             Close
 - Raw item JSON shown in the detail window redacts password and TOTP fields.
 - Optional Windows Credential Manager storage persists the Bitwarden CLI session
   key, not the master password.
+- Logging out runs `bw logout`, clears in-memory vault data, and removes the
+  stored PeekWarden session.
 
 ## Current Limitations
 
