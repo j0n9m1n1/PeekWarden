@@ -39,9 +39,9 @@ This project is early Windows-first software.
 | --- | --- |
 | <img src="login.png" alt="Bitwarden login screen" width="420"> | <img src="search.png" alt="Quick access search window" width="420"> |
 
-| Search results | Settings |
-| --- | --- |
-| <img src="result.png" alt="Search results" width="420"> | <img src="setting.png" alt="Settings dialog" width="420"> |
+| Search results | Item details | Settings |
+| --- | --- | --- |
+| <img src="result.png" alt="Search results" width="320"> | <img src="detail.png" alt="Item details" width="320"> | <img src="setting.png" alt="Settings dialog" width="320"> |
 
 ## Requirements
 
