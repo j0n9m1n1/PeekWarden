@@ -1508,6 +1508,17 @@ void QuickWindow::updateFooter()
     if (!m_footerLayout)
         return;
 
+    const auto hideFooter = [this] {
+        if (m_footer) {
+            m_footer->setVisible(false);
+            m_footer->setFixedHeight(0);
+            m_footer->setMinimumHeight(0);
+            m_footer->setMaximumHeight(0);
+            m_footer->updateGeometry();
+        }
+        updateWindowSize();
+    };
+
     while (QLayoutItem* item = m_footerLayout->takeAt(0)) {
         if (QWidget* widget = item->widget())
             widget->deleteLater();
@@ -1515,19 +1526,20 @@ void QuickWindow::updateFooter()
     }
 
     if (!AppSettings::showShortcutHints()) {
-        if (m_footer)
-            m_footer->setVisible(false);
+        hideFooter();
         return;
     }
 
     if (m_authMode != AuthMode::None) {
-        if (m_footer)
-            m_footer->setVisible(false);
+        hideFooter();
         return;
     }
 
-    if (m_footer)
+    if (m_footer) {
+        m_footer->setMinimumHeight(0);
+        m_footer->setMaximumHeight(QWIDGETSIZE_MAX);
         m_footer->setVisible(true);
+    }
 
     const auto addShortcut = [this](int row,
                                  int column,
@@ -1598,6 +1610,8 @@ void QuickWindow::updateWindowSize()
         const int footerFixedHeight = qMax(44, m_footerLayout->sizeHint().height() + 4);
         m_footer->setFixedHeight(footerFixedHeight);
         m_footer->adjustSize();
+    } else if (m_footer) {
+        m_footer->setFixedHeight(0);
     }
 
     QLayout* rootLayout = layout();

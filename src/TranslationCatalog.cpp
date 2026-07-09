@@ -13,7 +13,8 @@ namespace
     QT_TRANSLATE_NOOP("Main", "System tray is not available. PeekWarden will keep running without a tray icon."),
     QT_TRANSLATE_NOOP("Main", "Hotkey"),
     QT_TRANSLATE_NOOP("Main", "Failed to register the configured hotkey."),
-    QT_TRANSLATE_NOOP("Main", "Another app, such as 1Password, may already be using this shortcut.")
+    QT_TRANSLATE_NOOP("Main", "Another app, such as 1Password, may already be using this shortcut."),
+    QT_TRANSLATE_NOOP("Main", "PeekWarden is running. Press %1 to open quick access.")
 };
 
 [[maybe_unused]] const char* const WinHotkeyMessages[] = {

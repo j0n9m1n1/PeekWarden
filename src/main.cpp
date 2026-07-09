@@ -141,6 +141,21 @@ int main(int argc, char* argv[])
     window.showQuick();
 #endif
 
+    if (trayIcon.isVisible()) {
+        QTimer::singleShot(700, &trayIcon, [&trayIcon] {
+            if (!trayIcon.isVisible())
+                return;
+
+            trayIcon.showMessage(
+                "PeekWarden",
+                uiText("PeekWarden이 실행 중입니다. %1 키로 빠른 액세스를 열 수 있습니다.",
+                       "PeekWarden is running. Press %1 to open quick access.")
+                    .arg(AppSettings::showHotkeyText()),
+                QSystemTrayIcon::Information,
+                3500);
+        });
+    }
+
     QTimer::singleShot(0, &window, [&window] {
         window.preloadVault();
     });
