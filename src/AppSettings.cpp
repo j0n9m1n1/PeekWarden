@@ -1,6 +1,5 @@
 #include "AppSettings.h"
 
-#include <QColor>
 #include <QCoreApplication>
 #include <QDir>
 #include <QFontDatabase>
@@ -16,7 +15,7 @@ constexpr int DefaultReopenRetentionSeconds = 10;
 constexpr int DefaultAutoSyncIntervalMinutes = 5;
 constexpr int DefaultQuickFontSize = 13;
 constexpr double DefaultWindowOpacity = 0.96;
-const char* DefaultWindowBackgroundColor = "#3a2a3f";
+const char* DefaultTheme = "dark";
 
 const char* ShowHotkeyKey = "hotkeys/showQuick";
 const char* WindowWidthKey = "window/width";
@@ -37,7 +36,7 @@ const char* WindowPositionXKey = "window/positionX";
 const char* WindowPositionYKey = "window/positionY";
 const char* WindowOpacityKey = "window/opacity";
 const char* RoundedCornersKey = "window/roundedCorners";
-const char* WindowBackgroundColorKey = "window/backgroundColor";
+const char* ThemeKey = "ui/theme";
 const char* ReopenRetentionSecondsKey = "window/reopenRetentionSeconds";
 const char* AutoSyncIntervalMinutesKey = "bitwarden/autoSyncIntervalMinutes";
 const char* CloseOnFocusLossKey = "window/closeOnFocusLoss";
@@ -271,20 +270,16 @@ void AppSettings::setRoundedCorners(bool enabled)
     QSettings().setValue(RoundedCornersKey, enabled);
 }
 
-QString AppSettings::windowBackgroundColor()
+QString AppSettings::theme()
 {
-    const QColor color(QSettings().value(WindowBackgroundColorKey, DefaultWindowBackgroundColor).toString());
-    if (color.isValid())
-        return color.name(QColor::HexRgb);
-
-    return DefaultWindowBackgroundColor;
+    const QString value = QSettings().value(ThemeKey, DefaultTheme).toString().trimmed().toLower();
+    return value == QStringLiteral("light") ? QStringLiteral("light") : QStringLiteral("dark");
 }
 
-void AppSettings::setWindowBackgroundColor(const QString& color)
+void AppSettings::setTheme(const QString& theme)
 {
-    const QColor parsed(color.trimmed());
-    QSettings().setValue(WindowBackgroundColorKey,
-        parsed.isValid() ? parsed.name(QColor::HexRgb) : QString(DefaultWindowBackgroundColor));
+    const QString value = theme.trimmed().toLower();
+    QSettings().setValue(ThemeKey, value == QStringLiteral("light") ? QStringLiteral("light") : QStringLiteral("dark"));
 }
 
 int AppSettings::reopenRetentionSeconds()

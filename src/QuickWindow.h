@@ -104,6 +104,7 @@ private:
     void moveSelection(int delta);
     void prepareVault(bool interactive = true);
     void handlePrepareFinished();
+    void showStartupAuthPanel(AuthMode mode);
     void showAuthPanel(AuthMode mode);
     void hideAuthPanel();
     void submitAuth();

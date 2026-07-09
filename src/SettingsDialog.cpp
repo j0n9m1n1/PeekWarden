@@ -3,8 +3,6 @@
 #include "AppSettings.h"
 #include "I18n.h"
 
-#include <QColor>
-#include <QColorDialog>
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDialogButtonBox>
@@ -13,14 +11,19 @@
 #include <QFontComboBox>
 #include <QFontDatabase>
 #include <QGridLayout>
+#include <QGroupBox>
 #include <QHBoxLayout>
 #include <QKeySequenceEdit>
 #include <QLabel>
 #include <QLineEdit>
 #include <QMessageBox>
+#include <QMouseEvent>
 #include <QPushButton>
+#include <QScrollArea>
+#include <QSizePolicy>
 #include <QSlider>
 #include <QSpinBox>
+#include <QTabWidget>
 #include <QVBoxLayout>
 #include <QtGlobal>
 
@@ -60,7 +63,9 @@ SettingsDialog::SettingsDialog(QWidget* parent)
 {
     setWindowTitle(uiText("PeekWarden Settings", "PeekWarden 설정"));
     setModal(true);
-    resize(640, 560);
+    setWindowFlags(Qt::Dialog | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint);
+    resize(760, 540);
+    setMinimumSize(700, 460);
 
     m_languageCombo = new QComboBox(this);
     const QString currentLanguage = AppSettings::language();
@@ -69,36 +74,51 @@ SettingsDialog::SettingsDialog(QWidget* parent)
         m_languageCombo->addItem(I18n::languageName(code), code);
     const int languageIndex = m_languageCombo->findData(currentLanguage);
     m_languageCombo->setCurrentIndex(languageIndex >= 0 ? languageIndex : m_languageCombo->findData(QStringLiteral("en")));
-    m_languageCombo->setMaximumWidth(260);
+    m_languageCombo->setMinimumWidth(240);
+    m_languageCombo->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+
+    m_themeCombo = new QComboBox(this);
+    m_themeCombo->addItem(uiText("Dark", "다크"), "dark");
+    m_themeCombo->addItem(uiText("Light", "라이트"), "light");
+    const int themeIndex = m_themeCombo->findData(AppSettings::theme());
+    m_themeCombo->setCurrentIndex(themeIndex >= 0 ? themeIndex : 0);
+    m_themeCombo->setMinimumWidth(180);
+    m_themeCombo->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
 
     m_hotkeyEdit = new QKeySequenceEdit(AppSettings::showHotkey(), this);
     m_hotkeyEdit->setMaximumSequenceLength(1);
-    m_hotkeyEdit->setMaximumWidth(260);
+    m_hotkeyEdit->setMinimumWidth(240);
+    m_hotkeyEdit->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
 
     m_shortcutPresetCombo = new QComboBox(this);
     m_shortcutPresetCombo->addItem(uiText("1Password style", "1Password 스타일"), "1password");
     m_shortcutPresetCombo->addItem(uiText("Bitwarden style", "Bitwarden 스타일"), "bitwarden");
     const int shortcutPresetIndex = m_shortcutPresetCombo->findData(AppSettings::shortcutPreset());
     m_shortcutPresetCombo->setCurrentIndex(shortcutPresetIndex >= 0 ? shortcutPresetIndex : 0);
-    m_shortcutPresetCombo->setMaximumWidth(260);
+    m_shortcutPresetCombo->setMinimumWidth(240);
+    m_shortcutPresetCombo->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+
+    const auto configureSpinBox = [](QSpinBox* spinBox, int width) {
+        spinBox->setFixedWidth(width);
+    };
 
     m_widthSpin = new QSpinBox(this);
     m_widthSpin->setRange(360, 1200);
     m_widthSpin->setSuffix(" px");
     m_widthSpin->setValue(AppSettings::windowWidth());
-    m_widthSpin->setFixedWidth(92);
+    configureSpinBox(m_widthSpin, 126);
 
     m_heightSpin = new QSpinBox(this);
     m_heightSpin->setRange(180, 900);
     m_heightSpin->setSuffix(" px");
     m_heightSpin->setValue(AppSettings::windowHeight());
-    m_heightSpin->setFixedWidth(92);
+    configureSpinBox(m_heightSpin, 126);
 
     m_resultLimitSpin = new QSpinBox(this);
     m_resultLimitSpin->setRange(1, 20);
     m_resultLimitSpin->setSuffix(uiText(" rows", " 개"));
     m_resultLimitSpin->setValue(AppSettings::searchResultLimit());
-    m_resultLimitSpin->setFixedWidth(92);
+    configureSpinBox(m_resultLimitSpin, 116);
 
     m_showShortcutHintsCheck = new QCheckBox(uiText("Shortcut hints", "단축키 안내"), this);
     m_showShortcutHintsCheck->setChecked(AppSettings::showShortcutHints());
@@ -128,13 +148,14 @@ SettingsDialog::SettingsDialog(QWidget* parent)
 
     m_fontCombo = new QFontComboBox(this);
     m_fontCombo->setCurrentFont(QFont(AppSettings::quickFontFamily()));
-    m_fontCombo->setMaximumWidth(180);
+    m_fontCombo->setMinimumWidth(220);
+    m_fontCombo->setFixedWidth(240);
 
     m_fontSizeSpin = new QSpinBox(this);
     m_fontSizeSpin->setRange(9, 22);
     m_fontSizeSpin->setSuffix(" pt");
     m_fontSizeSpin->setValue(AppSettings::quickFontSize());
-    m_fontSizeSpin->setFixedWidth(82);
+    configureSpinBox(m_fontSizeSpin, 96);
 
     m_fontBoldCheck = new QCheckBox(uiText("Bold", "굵게"), this);
     m_fontBoldCheck->setChecked(AppSettings::quickFontBold());
@@ -142,9 +163,10 @@ SettingsDialog::SettingsDialog(QWidget* parent)
     auto* fontLayout = new QHBoxLayout;
     fontLayout->setContentsMargins(0, 0, 0, 0);
     fontLayout->setSpacing(8);
-    fontLayout->addWidget(m_fontCombo, 1);
+    fontLayout->addWidget(m_fontCombo);
     fontLayout->addWidget(m_fontSizeSpin);
     fontLayout->addWidget(m_fontBoldCheck);
+    fontLayout->addStretch(1);
 
     m_customPositionCheck = new QCheckBox(uiText("Custom", "직접 지정"), this);
     m_customPositionCheck->setChecked(AppSettings::customWindowPositionEnabled());
@@ -154,25 +176,27 @@ SettingsDialog::SettingsDialog(QWidget* parent)
     m_positionXSpin->setPrefix("X ");
     m_positionXSpin->setSuffix(" px");
     m_positionXSpin->setValue(AppSettings::windowPositionX());
-    m_positionXSpin->setFixedWidth(92);
+    configureSpinBox(m_positionXSpin, 112);
 
     m_positionYSpin = new QSpinBox(this);
     m_positionYSpin->setRange(-20000, 20000);
     m_positionYSpin->setPrefix("Y ");
     m_positionYSpin->setSuffix(" px");
     m_positionYSpin->setValue(AppSettings::windowPositionY());
-    m_positionYSpin->setFixedWidth(92);
+    configureSpinBox(m_positionYSpin, 112);
 
     auto* positionLayout = new QHBoxLayout;
     positionLayout->setContentsMargins(0, 0, 0, 0);
+    positionLayout->setSpacing(8);
     positionLayout->addWidget(m_customPositionCheck);
     positionLayout->addWidget(m_positionXSpin);
     positionLayout->addWidget(m_positionYSpin);
+    positionLayout->addStretch(1);
 
     m_opacitySlider = new QSlider(Qt::Horizontal, this);
     m_opacitySlider->setRange(70, 100);
     m_opacitySlider->setValue(qRound(AppSettings::windowOpacity() * 100.0));
-    m_opacitySlider->setMaximumWidth(150);
+    m_opacitySlider->setFixedWidth(260);
 
     m_opacityValue = new QLabel(this);
     m_opacityValue->setFixedWidth(42);
@@ -180,18 +204,16 @@ SettingsDialog::SettingsDialog(QWidget* parent)
 
     auto* opacityLayout = new QHBoxLayout;
     opacityLayout->setContentsMargins(0, 0, 0, 0);
-    opacityLayout->addWidget(m_opacitySlider, 1);
+    opacityLayout->setSpacing(8);
+    opacityLayout->addWidget(m_opacitySlider);
     opacityLayout->addWidget(m_opacityValue);
+    opacityLayout->addStretch(1);
 
     m_cornerCombo = new QComboBox(this);
     m_cornerCombo->addItem(uiText("Square", "사각"), false);
     m_cornerCombo->addItem(uiText("Rounded", "둥근 모서리"), true);
     m_cornerCombo->setCurrentIndex(AppSettings::roundedCorners() ? 1 : 0);
-    m_cornerCombo->setMaximumWidth(120);
-
-    m_backgroundColorButton = new QPushButton(this);
-    m_backgroundColorButton->setMaximumWidth(110);
-    updateBackgroundColorButton();
+    m_cornerCombo->setFixedWidth(120);
 
     auto* shortcutsTitle = new QLabel(uiText("Shortcuts", "단축키"), this);
     shortcutsTitle->setObjectName("settingsSectionTitle");
@@ -206,14 +228,14 @@ SettingsDialog::SettingsDialog(QWidget* parent)
     m_reopenRetentionSpin->setSuffix(uiText(" sec", " 초"));
     m_reopenRetentionSpin->setSpecialValueText(uiText("Disabled", "사용 안 함"));
     m_reopenRetentionSpin->setValue(AppSettings::reopenRetentionSeconds());
-    m_reopenRetentionSpin->setFixedWidth(94);
+    configureSpinBox(m_reopenRetentionSpin, 124);
 
     m_autoSyncIntervalSpin = new QSpinBox(this);
     m_autoSyncIntervalSpin->setRange(0, 1440);
     m_autoSyncIntervalSpin->setSuffix(uiText(" min", " 분"));
     m_autoSyncIntervalSpin->setSpecialValueText(uiText("Disabled", "사용 안 함"));
     m_autoSyncIntervalSpin->setValue(AppSettings::autoSyncIntervalMinutes());
-    m_autoSyncIntervalSpin->setFixedWidth(94);
+    configureSpinBox(m_autoSyncIntervalSpin, 124);
 
     m_closeOnFocusLossCheck = new QCheckBox(uiText("Close on focus loss", "포커스 해제 시 닫기"), this);
     m_closeOnFocusLossCheck->setChecked(AppSettings::closeOnFocusLoss());
@@ -263,48 +285,6 @@ SettingsDialog::SettingsDialog(QWidget* parent)
     searchDisplayLayout->addWidget(m_fetchFaviconsFromWebCheck, 1, 1);
     searchDisplayLayout->setColumnStretch(1, 1);
 
-    auto* appearanceLayout = new QHBoxLayout;
-    appearanceLayout->setContentsMargins(0, 0, 0, 0);
-    appearanceLayout->setSpacing(8);
-    appearanceLayout->addLayout(opacityLayout, 1);
-    appearanceLayout->addWidget(m_cornerCombo);
-    appearanceLayout->addWidget(m_backgroundColorButton);
-
-    auto* behaviorLayout = new QGridLayout;
-    behaviorLayout->setContentsMargins(0, 0, 0, 0);
-    behaviorLayout->setHorizontalSpacing(8);
-    behaviorLayout->setVerticalSpacing(4);
-    behaviorLayout->addWidget(new QLabel(uiText("Keep search", "검색 유지"), this), 0, 0);
-    behaviorLayout->addWidget(m_reopenRetentionSpin, 0, 1);
-    behaviorLayout->addWidget(new QLabel(uiText("Auto sync", "자동 동기화"), this), 0, 2);
-    behaviorLayout->addWidget(m_autoSyncIntervalSpin, 0, 3);
-    behaviorLayout->addWidget(m_closeOnFocusLossCheck, 1, 0, 1, 4);
-    behaviorLayout->setColumnStretch(4, 1);
-
-    auto* securityLayout = new QVBoxLayout;
-    securityLayout->setContentsMargins(0, 0, 0, 0);
-    securityLayout->setSpacing(4);
-    securityLayout->addWidget(m_credentialSessionStorageCheck);
-    securityLayout->addWidget(m_startOnLoginCheck);
-    securityLayout->addWidget(m_logoutButton);
-
-    auto* form = new QFormLayout;
-    form->setLabelAlignment(Qt::AlignRight);
-    form->setHorizontalSpacing(12);
-    form->setVerticalSpacing(8);
-    form->addRow(uiText("Language", "언어"), m_languageCombo);
-    form->addRow(uiText("Quick access hotkey", "빠른 액세스 단축키"), m_hotkeyEdit);
-    form->addRow(uiText("Shortcut set", "단축키 세트"), m_shortcutPresetCombo);
-    form->addRow(uiText("Window size", "창 크기"), sizeLayout);
-    form->addRow(uiText("Search/display", "검색/표시"), searchDisplayLayout);
-    form->addRow(uiText("Result row fields", "결과 행 표시"), resultFieldsLayout);
-    form->addRow(uiText("Quick window font", "빠른 창 폰트"), fontLayout);
-    form->addRow(uiText("Window position", "창 위치"), positionLayout);
-    form->addRow(uiText("Appearance", "모양"), appearanceLayout);
-    form->addRow(uiText("Behavior", "동작"), behaviorLayout);
-    form->addRow(uiText("Security/startup", "보안/시작"), securityLayout);
-    form->addRow(uiText("bw.exe location", "bw.exe 위치"), bwLayout);
-
     auto* note = new QLabel(
         uiText("Leave bw.exe empty to use bw.exe beside PeekWarden first, then bw from PATH. Session storage does not store the master password.",
                "비워두면 PeekWarden 실행 파일 옆의 bw.exe를 먼저 사용하고, 없으면 PATH의 bw를 사용합니다. 세션 저장은 마스터 비밀번호를 저장하지 않습니다."),
@@ -324,104 +304,102 @@ SettingsDialog::SettingsDialog(QWidget* parent)
 
     auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
 
-    auto* formColumn = new QVBoxLayout;
-    formColumn->setContentsMargins(0, 0, 0, 0);
-    formColumn->setSpacing(9);
-    formColumn->addLayout(form);
-    formColumn->addWidget(note);
-    formColumn->addWidget(cliDocs);
-    formColumn->addStretch(1);
+    auto* tabs = new QTabWidget(this);
+    tabs->setObjectName("settingsTabs");
 
-    auto* shortcutPanel = new QWidget(this);
-    shortcutPanel->setObjectName("settingsShortcutPanel");
-    shortcutPanel->setFixedWidth(188);
+    const auto makeTab = [this, tabs](const QString& title) {
+        auto* scrollArea = new QScrollArea(this);
+        scrollArea->setObjectName("settingsScrollArea");
+        scrollArea->setWidgetResizable(true);
+
+        auto* page = new QWidget(scrollArea);
+        auto* pageLayout = new QVBoxLayout(page);
+        pageLayout->setContentsMargins(14, 14, 14, 14);
+        pageLayout->setSpacing(12);
+
+        scrollArea->setWidget(page);
+        tabs->addTab(scrollArea, title);
+        return pageLayout;
+    };
+
+    const auto makeGroup = [this](const QString& title, QVBoxLayout* parentLayout) {
+        auto* group = new QGroupBox(title, this);
+        group->setObjectName("settingsGroup");
+
+        auto* groupForm = new QFormLayout(group);
+        groupForm->setFieldGrowthPolicy(QFormLayout::ExpandingFieldsGrow);
+        groupForm->setRowWrapPolicy(QFormLayout::WrapLongRows);
+        groupForm->setLabelAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+        groupForm->setFormAlignment(Qt::AlignTop);
+        groupForm->setHorizontalSpacing(16);
+        groupForm->setVerticalSpacing(10);
+
+        parentLayout->addWidget(group);
+        return groupForm;
+    };
+
+    auto* generalTab = makeTab(uiText("General", "일반"));
+    auto* generalForm = makeGroup(uiText("General", "일반"), generalTab);
+    generalForm->addRow(uiText("Language", "언어"), m_languageCombo);
+    generalForm->addRow(uiText("Theme", "테마"), m_themeCombo);
+    generalForm->addRow(uiText("Quick access hotkey", "빠른 액세스 단축키"), m_hotkeyEdit);
+    generalForm->addRow(uiText("Shortcut set", "단축키 세트"), m_shortcutPresetCombo);
+
+    auto* shortcutPanel = new QGroupBox(this);
+    shortcutPanel->setObjectName("settingsGroup");
     auto* shortcutColumn = new QVBoxLayout(shortcutPanel);
-    shortcutColumn->setContentsMargins(12, 12, 12, 12);
+    shortcutColumn->setContentsMargins(14, 16, 14, 14);
     shortcutColumn->setSpacing(8);
     shortcutColumn->addWidget(shortcutsTitle);
     shortcutColumn->addWidget(m_shortcutsLabel);
     shortcutColumn->addStretch(1);
+    generalTab->addWidget(shortcutPanel);
+    generalTab->addStretch(1);
 
-    auto* contentLayout = new QHBoxLayout;
-    contentLayout->setContentsMargins(0, 0, 0, 0);
-    contentLayout->setSpacing(12);
-    contentLayout->addLayout(formColumn, 1);
-    contentLayout->addWidget(shortcutPanel);
+    auto* quickWindowTab = makeTab(uiText("Quick Window", "빠른 창"));
+    auto* displayForm = makeGroup(uiText("Search and Display", "검색/표시"), quickWindowTab);
+    displayForm->addRow(uiText("Window size", "창 크기"), sizeLayout);
+    displayForm->addRow(uiText("Search/display", "검색/표시"), searchDisplayLayout);
+    displayForm->addRow(uiText("Result row fields", "결과 행 표시"), resultFieldsLayout);
+
+    auto* appearanceForm = makeGroup(uiText("Appearance", "모양"), quickWindowTab);
+    appearanceForm->addRow(uiText("Quick window font", "빠른 창 폰트"), fontLayout);
+    appearanceForm->addRow(uiText("Window position", "창 위치"), positionLayout);
+    appearanceForm->addRow(uiText("Opacity", "투명도"), opacityLayout);
+    appearanceForm->addRow(uiText("Corners", "모서리"), m_cornerCombo);
+    quickWindowTab->addStretch(1);
+
+    auto* behaviorTab = makeTab(uiText("Behavior", "동작"));
+    auto* behaviorForm = makeGroup(uiText("Behavior", "동작"), behaviorTab);
+    behaviorForm->addRow(uiText("Keep search", "검색 유지"), m_reopenRetentionSpin);
+    behaviorForm->addRow(uiText("Auto sync", "자동 동기화"), m_autoSyncIntervalSpin);
+    behaviorForm->addRow(m_closeOnFocusLossCheck);
+
+    auto* securityForm = makeGroup(uiText("Security and Startup", "보안/시작"), behaviorTab);
+    securityForm->addRow(m_credentialSessionStorageCheck);
+    securityForm->addRow(m_startOnLoginCheck);
+    securityForm->addRow(m_logoutButton);
+    behaviorTab->addStretch(1);
+
+    auto* bitwardenTab = makeTab(uiText("Bitwarden CLI", "Bitwarden CLI"));
+    auto* bitwardenForm = makeGroup(uiText("Bitwarden CLI", "Bitwarden CLI"), bitwardenTab);
+    bitwardenForm->addRow(uiText("bw.exe location", "bw.exe 위치"), bwLayout);
+    bitwardenTab->addWidget(note);
+    bitwardenTab->addWidget(cliDocs);
+    bitwardenTab->addStretch(1);
+
+    auto* titleLabel = new QLabel(windowTitle(), this);
+    titleLabel->setObjectName("settingsDialogTitle");
+    titleLabel->setAttribute(Qt::WA_TransparentForMouseEvents);
 
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(16, 14, 16, 14);
     layout->setSpacing(10);
-    layout->addLayout(contentLayout);
+    layout->addWidget(titleLabel);
+    layout->addWidget(tabs, 1);
     layout->addWidget(buttons);
 
-    setStyleSheet(R"(
-        QDialog {
-            background: #3b2b40;
-            color: #f0ecf5;
-        }
-        QLabel {
-            color: #f0ecf5;
-        }
-        #settingsNote {
-            color: #c9becf;
-            font-size: 12px;
-        }
-        #settingsLink {
-            color: #c9becf;
-            font-size: 12px;
-        }
-        #settingsLink a {
-            color: #7db7ff;
-            text-decoration: none;
-        }
-        #settingsShortcutPanel {
-            background: #21192a;
-            border: 1px solid #594d64;
-            border-radius: 8px;
-        }
-        #settingsSectionTitle {
-            color: #ffffff;
-            font-size: 13px;
-            font-weight: 800;
-        }
-        #settingsShortcutText {
-            color: #d8cedf;
-            font-size: 11px;
-            line-height: 140%;
-        }
-        QLineEdit, QSpinBox, QKeySequenceEdit, QComboBox {
-            background: #191326;
-            color: #f7f3ff;
-            border: 1px solid #5f5270;
-            border-radius: 6px;
-            padding: 5px 8px;
-            selection-background-color: #1f8cff;
-            selection-color: #ffffff;
-        }
-        QCheckBox {
-            color: #f0ecf5;
-        }
-        QPushButton {
-            background: #5a5064;
-            color: #f7f3ff;
-            border: 1px solid #72667d;
-            border-radius: 6px;
-            padding: 5px 10px;
-        }
-        QPushButton:hover {
-            background: #6a5e75;
-        }
-        QPushButton:pressed {
-            background: #4d4456;
-        }
-        #dangerButton {
-            background: #6d2a3a;
-            border-color: #95576a;
-        }
-        #dangerButton:hover {
-            background: #7f3447;
-        }
-    )");
+    applyDialogStyle();
 
     connect(m_opacitySlider, &QSlider::valueChanged, this, [this] {
         updateOpacityLabel();
@@ -430,6 +408,10 @@ SettingsDialog::SettingsDialog(QWidget* parent)
     connect(m_languageCombo, &QComboBox::currentIndexChanged, this, [this] {
         applyRecommendedFontForLanguage(m_languageCombo->currentData().toString());
         updateShortcutGuide();
+    });
+
+    connect(m_themeCombo, &QComboBox::currentIndexChanged, this, [this] {
+        applyDialogStyle();
     });
 
     connect(m_customPositionCheck, &QCheckBox::toggled, this, [this](bool enabled) {
@@ -450,10 +432,6 @@ SettingsDialog::SettingsDialog(QWidget* parent)
 
     connect(m_shortcutPresetCombo, &QComboBox::currentIndexChanged, this, [this] {
         updateShortcutGuide();
-    });
-
-    connect(m_backgroundColorButton, &QPushButton::clicked, this, [this] {
-        chooseBackgroundColor();
     });
 
     connect(browseButton, &QPushButton::clicked, this, [this] {
@@ -484,6 +462,35 @@ bool SettingsDialog::logoutRequested() const
     return m_logoutRequested;
 }
 
+void SettingsDialog::mousePressEvent(QMouseEvent* event)
+{
+    if (event->button() == Qt::LeftButton) {
+        m_dragging = true;
+        m_dragOffset = event->globalPosition().toPoint() - frameGeometry().topLeft();
+        event->accept();
+        return;
+    }
+
+    QDialog::mousePressEvent(event);
+}
+
+void SettingsDialog::mouseMoveEvent(QMouseEvent* event)
+{
+    if (m_dragging && event->buttons().testFlag(Qt::LeftButton)) {
+        move(event->globalPosition().toPoint() - m_dragOffset);
+        event->accept();
+        return;
+    }
+
+    QDialog::mouseMoveEvent(event);
+}
+
+void SettingsDialog::mouseReleaseEvent(QMouseEvent* event)
+{
+    m_dragging = false;
+    QDialog::mouseReleaseEvent(event);
+}
+
 void SettingsDialog::chooseBwProgram()
 {
     const QString path = QFileDialog::getOpenFileName(
@@ -494,17 +501,6 @@ void SettingsDialog::chooseBwProgram()
 
     if (!path.isEmpty())
         m_bwPathEdit->setText(path);
-}
-
-void SettingsDialog::chooseBackgroundColor()
-{
-    const QColor current(AppSettings::windowBackgroundColor());
-    const QColor selected = QColorDialog::getColor(current, this, uiText("Background color", "배경 색상"));
-    if (!selected.isValid())
-        return;
-
-    m_backgroundColorButton->setProperty("selectedColor", selected.name(QColor::HexRgb));
-    updateBackgroundColorButton();
 }
 
 void SettingsDialog::requestLogout()
@@ -535,6 +531,7 @@ void SettingsDialog::saveAndAccept()
     }
 
     AppSettings::setLanguage(m_languageCombo->currentData().toString());
+    AppSettings::setTheme(m_themeCombo->currentData().toString());
     AppSettings::setShowHotkey(m_hotkeyEdit->keySequence());
     AppSettings::setShortcutPreset(m_shortcutPresetCombo->currentData().toString());
     AppSettings::setWindowWidth(m_widthSpin->value());
@@ -554,7 +551,6 @@ void SettingsDialog::saveAndAccept()
     AppSettings::setWindowPositionY(m_positionYSpin->value());
     AppSettings::setWindowOpacity(m_opacitySlider->value() / 100.0);
     AppSettings::setRoundedCorners(m_cornerCombo->currentData().toBool());
-    AppSettings::setWindowBackgroundColor(m_backgroundColorButton->property("selectedColor").toString());
     AppSettings::setReopenRetentionSeconds(m_reopenRetentionSpin->value());
     AppSettings::setAutoSyncIntervalMinutes(m_autoSyncIntervalSpin->value());
     AppSettings::setCloseOnFocusLoss(m_closeOnFocusLossCheck->isChecked());
@@ -564,20 +560,236 @@ void SettingsDialog::saveAndAccept()
     accept();
 }
 
-void SettingsDialog::updateBackgroundColorButton()
+void SettingsDialog::applyDialogStyle()
 {
-    QString color = m_backgroundColorButton->property("selectedColor").toString();
-    if (color.isEmpty()) {
-        color = AppSettings::windowBackgroundColor();
-        m_backgroundColorButton->setProperty("selectedColor", color);
+    const QString selectedTheme = m_themeCombo ? m_themeCombo->currentData().toString() : AppSettings::theme();
+    const bool lightTheme = selectedTheme == QStringLiteral("light");
+
+    if (lightTheme) {
+        setStyleSheet(R"(
+            QDialog {
+                background: #f6f8fa;
+                border: 1px solid #d0d7de;
+            }
+            QLabel {
+                color: #24292f;
+            }
+            #settingsDialogTitle {
+                color: #111827;
+                font-size: 14px;
+                font-weight: 800;
+                padding: 1px 2px 5px 2px;
+            }
+            #settingsNote, #settingsLink {
+                color: #57606a;
+                font-size: 12px;
+            }
+            #settingsLink a {
+                color: #0969da;
+                text-decoration: none;
+            }
+            #settingsTabs::pane {
+                border: 1px solid #d0d7de;
+                border-radius: 8px;
+                background: #ffffff;
+            }
+            #settingsTabs QTabBar::tab {
+                background: #eef1f4;
+                color: #57606a;
+                border: 1px solid #d0d7de;
+                border-bottom: 0;
+                border-top-left-radius: 6px;
+                border-top-right-radius: 6px;
+                padding: 7px 14px;
+                margin-right: 3px;
+            }
+            #settingsTabs QTabBar::tab:selected {
+                background: #ffffff;
+                color: #111827;
+                border-color: #afb8c1;
+            }
+            #settingsTabs QTabBar::tab:hover {
+                background: #eaeef2;
+            }
+            #settingsScrollArea {
+                background: transparent;
+                border: 0;
+            }
+            #settingsScrollArea > QWidget > QWidget {
+                background: transparent;
+            }
+            #settingsGroup {
+                background: #ffffff;
+                border: 1px solid #d0d7de;
+                border-radius: 8px;
+                margin-top: 12px;
+                padding: 10px 12px 12px 12px;
+            }
+            #settingsGroup::title {
+                subcontrol-origin: margin;
+                left: 10px;
+                padding: 0 6px;
+                color: #111827;
+                font-size: 13px;
+                font-weight: 800;
+            }
+            #settingsSectionTitle {
+                color: #111827;
+                font-size: 13px;
+                font-weight: 800;
+            }
+            #settingsShortcutText {
+                color: #57606a;
+                font-size: 11px;
+                line-height: 140%;
+            }
+            QLineEdit, QKeySequenceEdit, QComboBox {
+                background: #ffffff;
+                color: #24292f;
+                border: 1px solid #d0d7de;
+                border-radius: 6px;
+                padding: 5px 8px;
+                selection-background-color: #0969da;
+                selection-color: #ffffff;
+            }
+            QCheckBox {
+                color: #24292f;
+            }
+            QPushButton {
+                background: #f3f4f6;
+                color: #24292f;
+                border: 1px solid #d0d7de;
+                border-radius: 6px;
+                padding: 5px 10px;
+            }
+            QPushButton:hover {
+                background: #eaeef2;
+            }
+            QPushButton:pressed {
+                background: #d8dee4;
+            }
+            #dangerButton {
+                background: #fff1f1;
+                color: #b42318;
+                border-color: #f0b8b8;
+            }
+            #dangerButton:hover {
+                background: #ffe4e4;
+            }
+        )");
+        return;
     }
 
-    m_backgroundColorButton->setProperty("selectedColor", color);
-    m_backgroundColorButton->setText(color);
-    m_backgroundColorButton->setStyleSheet(QString(
-        "QPushButton { background: %1; color: #f7f3ff; border: 1px solid #72667d; border-radius: 6px; padding: 6px 10px; }"
-        "QPushButton:hover { border-color: #8d7d99; }")
-        .arg(color));
+    setStyleSheet(R"(
+        QDialog {
+            background: #202124;
+            border: 1px solid #0b0c0f;
+        }
+        QLabel {
+            color: #e8eaed;
+        }
+        #settingsDialogTitle {
+            color: #f8f9fa;
+            font-size: 14px;
+            font-weight: 800;
+            padding: 1px 2px 5px 2px;
+        }
+        #settingsNote, #settingsLink {
+            color: #b7bdc6;
+            font-size: 12px;
+        }
+        #settingsLink a {
+            color: #6bb6ff;
+            text-decoration: none;
+        }
+        #settingsTabs::pane {
+            border: 1px solid #3a3f46;
+            border-radius: 8px;
+            background: #181a1f;
+        }
+        #settingsTabs QTabBar::tab {
+            background: #15171a;
+            color: #c5cbd3;
+            border: 1px solid #3a3f46;
+            border-bottom: 0;
+            border-top-left-radius: 6px;
+            border-top-right-radius: 6px;
+            padding: 7px 14px;
+            margin-right: 3px;
+        }
+        #settingsTabs QTabBar::tab:selected {
+            background: #202124;
+            color: #f8f9fa;
+            border-color: #58606b;
+        }
+        #settingsTabs QTabBar::tab:hover {
+            background: #252a30;
+        }
+        #settingsScrollArea {
+            background: transparent;
+            border: 0;
+        }
+        #settingsScrollArea > QWidget > QWidget {
+            background: transparent;
+        }
+        #settingsGroup {
+            background: #15171a;
+            border: 1px solid #3a3f46;
+            border-radius: 8px;
+            margin-top: 12px;
+            padding: 10px 12px 12px 12px;
+        }
+        #settingsGroup::title {
+            subcontrol-origin: margin;
+            left: 10px;
+            padding: 0 6px;
+            color: #f8f9fa;
+            font-size: 13px;
+            font-weight: 800;
+        }
+        #settingsSectionTitle {
+            color: #f8f9fa;
+            font-size: 13px;
+            font-weight: 800;
+        }
+        #settingsShortcutText {
+            color: #c5cbd3;
+            font-size: 11px;
+            line-height: 140%;
+        }
+        QLineEdit, QKeySequenceEdit, QComboBox {
+            background: #111317;
+            color: #f1f3f4;
+            border: 1px solid #3a3f46;
+            border-radius: 6px;
+            padding: 5px 8px;
+            selection-background-color: #1f8cff;
+            selection-color: #ffffff;
+        }
+        QCheckBox {
+            color: #e8eaed;
+        }
+        QPushButton {
+            background: #2f343a;
+            color: #f1f3f4;
+            border: 1px solid #4b5563;
+            border-radius: 6px;
+            padding: 5px 10px;
+        }
+        QPushButton:hover {
+            background: #3a4048;
+        }
+        QPushButton:pressed {
+            background: #252a30;
+        }
+        #dangerButton {
+            background: #7f1d1d;
+            border-color: #b45353;
+        }
+        #dangerButton:hover {
+            background: #991b1b;
+        }
+    )");
 }
 
 void SettingsDialog::updateOpacityLabel()

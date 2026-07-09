@@ -84,6 +84,20 @@ cmake --build build --config Release
 If Qt is already discoverable by CMake, the `CMAKE_PREFIX_PATH` argument is not
 needed.
 
+## GitHub Release Build
+
+GitHub Actions builds a Windows release package when a version tag is pushed:
+
+```powershell
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+The workflow creates a `PeekWarden-<tag>-win64.zip` package with `PeekWarden.exe`,
+Qt runtime DLLs from `windeployqt`, translations, `README.md`, and `LICENSE`, then
+attaches it to the GitHub Release. It can also be run manually from the Actions
+tab.
+
 ## Usage
 
 Default quick-access hotkey:

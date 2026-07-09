@@ -552,6 +552,18 @@ Install Bitwarden CLI or set bw.exe location in Settings.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>Theme</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Dark</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Light</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Quick access hotkey</source>
         <translation type="unfinished"></translation>
     </message>
@@ -617,10 +629,6 @@ Install Bitwarden CLI or set bw.exe location in Settings.</source>
     </message>
     <message>
         <source>Bitwarden CLI (bw.exe bw);;All files (*)</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Background color</source>
         <translation type="unfinished"></translation>
     </message>
     <message>

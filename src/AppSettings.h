@@ -64,8 +64,8 @@ public:
     static bool roundedCorners();
     static void setRoundedCorners(bool enabled);
 
-    static QString windowBackgroundColor();
-    static void setWindowBackgroundColor(const QString& color);
+    static QString theme();
+    static void setTheme(const QString& theme);
 
     static int reopenRetentionSeconds();
     static void setReopenRetentionSeconds(int seconds);

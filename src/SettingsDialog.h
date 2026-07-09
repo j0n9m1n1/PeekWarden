@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QDialog>
+#include <QPoint>
 
 class QLabel;
 class QCheckBox;
@@ -8,6 +9,7 @@ class QComboBox;
 class QFontComboBox;
 class QKeySequenceEdit;
 class QLineEdit;
+class QMouseEvent;
 class QPushButton;
 class QSlider;
 class QSpinBox;
@@ -18,12 +20,16 @@ public:
     explicit SettingsDialog(QWidget* parent = nullptr);
     bool logoutRequested() const;
 
+protected:
+    void mousePressEvent(QMouseEvent* event) override;
+    void mouseMoveEvent(QMouseEvent* event) override;
+    void mouseReleaseEvent(QMouseEvent* event) override;
+
 private:
     void chooseBwProgram();
-    void chooseBackgroundColor();
     void requestLogout();
     void saveAndAccept();
-    void updateBackgroundColorButton();
+    void applyDialogStyle();
     void updateOpacityLabel();
     void updateShortcutGuide();
     void applyRecommendedFontForLanguage(const QString& languageCode);
@@ -40,6 +46,7 @@ private:
     QCheckBox* m_showResultUsernameCheck = nullptr;
     QCheckBox* m_showResultUriCheck = nullptr;
     QCheckBox* m_showResultTypeCheck = nullptr;
+    QComboBox* m_themeCombo = nullptr;
     QFontComboBox* m_fontCombo = nullptr;
     QSpinBox* m_fontSizeSpin = nullptr;
     QCheckBox* m_fontBoldCheck = nullptr;
@@ -49,7 +56,6 @@ private:
     QSlider* m_opacitySlider = nullptr;
     QLabel* m_opacityValue = nullptr;
     QComboBox* m_cornerCombo = nullptr;
-    QPushButton* m_backgroundColorButton = nullptr;
     QLabel* m_shortcutsLabel = nullptr;
     QSpinBox* m_reopenRetentionSpin = nullptr;
     QSpinBox* m_autoSyncIntervalSpin = nullptr;
@@ -58,5 +64,7 @@ private:
     QCheckBox* m_startOnLoginCheck = nullptr;
     QPushButton* m_logoutButton = nullptr;
     QLineEdit* m_bwPathEdit = nullptr;
+    bool m_dragging = false;
+    QPoint m_dragOffset;
     bool m_logoutRequested = false;
 };

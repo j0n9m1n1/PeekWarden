@@ -1,0 +1,95 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      qt_version:
+        description: Qt version to build with
+        required: true
+        default: 6.11.1
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+env:
+  APP_NAME: PeekWarden
+  QT_VERSION: ${{ github.event.inputs.qt_version || '6.11.1' }}
+
+jobs:
+  windows:
+    name: Windows x64
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          host: windows
+          target: desktop
+          arch: win64_msvc2022_64
+          cache: true
+
+      - name: Configure
+        shell: pwsh
+        run: |
+          $qmake = (Get-Command qmake.exe).Source
+          $qtPrefix = Split-Path -Parent (Split-Path -Parent $qmake)
+
+          cmake `
+            -S . `
+            -B build `
+            -G "Visual Studio 17 2022" `
+            -A x64 `
+            -DCMAKE_PREFIX_PATH="$qtPrefix"
+
+      - name: Build
+        run: cmake --build build --config Release --parallel
+
+      - name: Package
+        shell: pwsh
+        run: |
+          $version = if ("${{ github.ref_type }}" -eq "tag") { "${{ github.ref_name }}" } else { "manual" }
+          $stage = Join-Path $PWD "dist\${{ env.APP_NAME }}-$version-win64"
+          $zip = "$stage.zip"
+          $exe = Join-Path $PWD "build\Release\${{ env.APP_NAME }}.exe"
+          $translations = Join-Path $PWD "build\Release\translations"
+
+          New-Item -ItemType Directory -Force -Path $stage | Out-Null
+          Copy-Item -LiteralPath $exe -Destination $stage
+          Copy-Item -LiteralPath LICENSE -Destination $stage
+          Copy-Item -LiteralPath README.md -Destination $stage
+
+          if (Test-Path -LiteralPath $translations) {
+            Copy-Item -LiteralPath $translations -Destination $stage -Recurse
+          }
+
+          windeployqt `
+            --release `
+            --compiler-runtime `
+            --no-system-d3d-compiler `
+            --no-opengl-sw `
+            (Join-Path $stage "${{ env.APP_NAME }}.exe")
+
+          Compress-Archive -Path "$stage\*" -DestinationPath $zip -Force
+          "PACKAGE_PATH=$zip" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.APP_NAME }}-win64
+          path: ${{ env.PACKAGE_PATH }}
+          if-no-files-found: error
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.PACKAGE_PATH }}
+          generate_release_notes: true

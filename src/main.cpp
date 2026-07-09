@@ -148,8 +148,8 @@ int main(int argc, char* argv[])
 
             trayIcon.showMessage(
                 "PeekWarden",
-                uiText("PeekWarden이 실행 중입니다. %1 키로 빠른 액세스를 열 수 있습니다.",
-                       "PeekWarden is running. Press %1 to open quick access.")
+                uiText("PeekWarden이 실행 중입니다.\n%1 키로 빠른 액세스를 열 수 있습니다.",
+                       "PeekWarden is running.\nPress %1 to open quick access.")
                     .arg(AppSettings::showHotkeyText()),
                 QSystemTrayIcon::Information,
                 3500);

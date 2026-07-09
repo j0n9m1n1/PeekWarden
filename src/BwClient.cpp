@@ -258,6 +258,71 @@ QString uiText(const char* ko, const char* en)
     return I18n::translate("BwClient", en, ko);
 }
 
+QString loginDialogStyle()
+{
+    if (AppSettings::theme() == QStringLiteral("light")) {
+        return QStringLiteral(R"(
+            QDialog {
+                background: #f8f9fa;
+                color: #24292f;
+            }
+            QLabel {
+                color: #24292f;
+            }
+            QLineEdit, QComboBox {
+                background: #ffffff;
+                color: #24292f;
+                border: 1px solid #d0d7de;
+                border-radius: 6px;
+                padding: 6px 8px;
+                selection-background-color: #0969da;
+                selection-color: #ffffff;
+                min-height: 24px;
+            }
+            QPushButton {
+                background: #f3f4f6;
+                color: #24292f;
+                border: 1px solid #d0d7de;
+                border-radius: 6px;
+                padding: 6px 10px;
+            }
+            QPushButton:hover {
+                background: #eaeef2;
+            }
+        )");
+    }
+
+    return QStringLiteral(R"(
+        QDialog {
+            background: #202124;
+            color: #e8eaed;
+        }
+        QLabel {
+            color: #e8eaed;
+        }
+        QLineEdit, QComboBox {
+            background: #111317;
+            color: #f1f3f4;
+            border: 1px solid #3a3f46;
+            border-radius: 6px;
+            padding: 6px 8px;
+            selection-background-color: #1f8cff;
+            selection-color: #ffffff;
+            min-height: 24px;
+        }
+        QPushButton {
+            background: #2f343a;
+            color: #f1f3f4;
+            border: 1px solid #4b5563;
+            border-radius: 6px;
+            padding: 6px 10px;
+        }
+        QPushButton:hover {
+            background: #3a4048;
+        }
+    )");
+}
+
 }
 
 bool BwClient::CommandResult::ok() const
@@ -510,35 +575,7 @@ bool BwClient::login(QWidget* parent, QString* errorMessage)
     dialog.setModal(true);
     dialog.resize(460, 250);
     dialog.setMinimumWidth(460);
-    dialog.setStyleSheet(R"(
-        QDialog {
-            background: #3b2b40;
-            color: #f0ecf5;
-        }
-        QLabel {
-            color: #f0ecf5;
-        }
-        QLineEdit, QComboBox {
-            background: #191326;
-            color: #f7f3ff;
-            border: 1px solid #5f5270;
-            border-radius: 6px;
-            padding: 6px 8px;
-            selection-background-color: #1f8cff;
-            selection-color: #ffffff;
-            min-height: 24px;
-        }
-        QPushButton {
-            background: #5a5064;
-            color: #f7f3ff;
-            border: 1px solid #72667d;
-            border-radius: 6px;
-            padding: 6px 10px;
-        }
-        QPushButton:hover {
-            background: #6a5e75;
-        }
-    )");
+    dialog.setStyleSheet(loginDialogStyle());
 
     auto* emailEdit = new QLineEdit(&dialog);
     emailEdit->setPlaceholderText("name@example.com");
