@@ -699,7 +699,7 @@ QuickWindow::QuickWindow(QWidget* parent)
 
     auto* authLayout = new QVBoxLayout(m_authPanel);
     authLayout->setContentsMargins(0, 0, 0, 0);
-    authLayout->setSpacing(8);
+    authLayout->setSpacing(6);
     authLayout->addWidget(m_authTitle);
     authLayout->addWidget(m_authNote);
     authLayout->addLayout(authForm);
@@ -1579,10 +1579,18 @@ void QuickWindow::updateWindowSize()
     const bool expanded = m_list && m_list->isVisible();
     int width = AppSettings::windowWidth();
     if (m_authPanel && m_authPanel->isVisible()) {
+        if (QLayout* authLayout = m_authPanel->layout()) {
+            authLayout->activate();
+            m_authPanel->setFixedHeight(authLayout->sizeHint().height());
+        }
+
         const int minimumAuthWidth = m_authMode == AuthMode::Unlock ? 420 : 500;
         const int maximumAuthWidth = qMax(AppSettings::windowWidth(), minimumAuthWidth);
         const int authContentWidth = m_authPanel->sizeHint().width() + 20;
         width = qMin(maximumAuthWidth, qMax(minimumAuthWidth, authContentWidth));
+    } else if (m_authPanel) {
+        m_authPanel->setMinimumHeight(0);
+        m_authPanel->setMaximumHeight(QWIDGETSIZE_MAX);
     }
 
     if (m_footer && m_footer->isVisible()) {
