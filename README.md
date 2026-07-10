@@ -1,5 +1,7 @@
 # PeekWarden
 
+[![Build](https://github.com/j0n9m1n1/PeekWarden/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/j0n9m1n1/PeekWarden/actions/workflows/ci.yml)
+
 ## References and Acknowledgements
 
 PeekWarden was designed with reference to:
@@ -25,7 +27,7 @@ This project is early Windows-first software.
 - Startup preload so unlocked vault items are cached before the search window is opened.
 - In-memory search over item names, usernames, URIs, notes, and basic metadata.
 - Fast keyboard actions for copying username, password, TOTP, and opening details.
-- Item detail window with redacted raw JSON, clickable website links, notes, and metadata.
+- Type-aware item details for logins, secure notes, cards, identities, and SSH keys.
 - Optional web favicon loading for search results.
 - System tray menu with open, lock, settings, and quit.
 - Settings action to log out of Bitwarden and clear the stored PeekWarden session.
@@ -138,10 +140,10 @@ Esc             Close
 - Vault item fields needed for quick search and copy are cached in memory while
   the app is running.
 - In-memory vault data is cleared when the vault is locked or the app exits.
-- Passwords copied to the clipboard are cleared after 30 seconds if the clipboard
-  still contains that same password.
+- Passwords and TOTP codes copied to the clipboard are cleared after 30 seconds if
+  PeekWarden still owns the same clipboard content.
+- Sensitive clipboard entries opt out of Windows clipboard history and cloud sync.
 - TOTP secrets and passwords are not written to PeekWarden settings.
-- Raw item JSON shown in the detail window redacts password and TOTP fields.
 - Optional Windows Credential Manager storage persists the Bitwarden CLI session
   key, not the master password.
 - Logging out runs `bw logout`, clears in-memory vault data, and removes the

@@ -448,10 +448,40 @@ Install Bitwarden CLI or set bw.exe location in Settings.</source>
         <source>Notes</source>
         <translation type="unfinished"></translation>
     </message>
-    <message>
-        <source>Raw JSON</source>
-        <translation type="unfinished"></translation>
-    </message>
+    <message><source>Secure note</source><translation type="unfinished"></translation></message>
+    <message><source>Card details</source><translation type="unfinished"></translation></message>
+    <message><source>Cardholder</source><translation type="unfinished"></translation></message>
+    <message><source>Brand</source><translation type="unfinished"></translation></message>
+    <message><source>Card number</source><translation type="unfinished"></translation></message>
+    <message><source>Expiration</source><translation type="unfinished"></translation></message>
+    <message><source>Security code</source><translation type="unfinished"></translation></message>
+    <message><source>No card fields</source><translation type="unfinished"></translation></message>
+    <message><source>Identity details</source><translation type="unfinished"></translation></message>
+    <message><source>Title</source><translation type="unfinished"></translation></message>
+    <message><source>First name</source><translation type="unfinished"></translation></message>
+    <message><source>Middle name</source><translation type="unfinished"></translation></message>
+    <message><source>Last name</source><translation type="unfinished"></translation></message>
+    <message><source>Company</source><translation type="unfinished"></translation></message>
+    <message><source>Phone</source><translation type="unfinished"></translation></message>
+    <message><source>Address 1</source><translation type="unfinished"></translation></message>
+    <message><source>Address 2</source><translation type="unfinished"></translation></message>
+    <message><source>Address 3</source><translation type="unfinished"></translation></message>
+    <message><source>City</source><translation type="unfinished"></translation></message>
+    <message><source>State / Province</source><translation type="unfinished"></translation></message>
+    <message><source>Postal code</source><translation type="unfinished"></translation></message>
+    <message><source>Country</source><translation type="unfinished"></translation></message>
+    <message><source>Social security number</source><translation type="unfinished"></translation></message>
+    <message><source>Passport number</source><translation type="unfinished"></translation></message>
+    <message><source>License number</source><translation type="unfinished"></translation></message>
+    <message><source>No identity fields</source><translation type="unfinished"></translation></message>
+    <message><source>SSH key</source><translation type="unfinished"></translation></message>
+    <message><source>Public key</source><translation type="unfinished"></translation></message>
+    <message><source>Fingerprint</source><translation type="unfinished"></translation></message>
+    <message><source>Private key</source><translation type="unfinished"></translation></message>
+    <message><source>No SSH key fields</source><translation type="unfinished"></translation></message>
+    <message><source>Custom fields</source><translation type="unfinished"></translation></message>
+    <message><source>Yes</source><translation type="unfinished"></translation></message>
+    <message><source>No</source><translation type="unfinished"></translation></message>
 </context>
 <context>
     <name>SettingsDialog</name>

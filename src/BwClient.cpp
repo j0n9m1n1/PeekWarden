@@ -74,22 +74,16 @@ QString itemTypeName(int type)
     }
 }
 
-QJsonObject redactedItemObject(const QJsonObject& object)
+QString jsonScalarText(const QJsonValue& value)
 {
-    QJsonObject redactedObject = object;
-    QJsonObject redactedLogin = redactedObject.value("login").toObject();
-    if (!redactedLogin.value("password").toString().isEmpty())
-        redactedLogin.insert("password", "[redacted]");
-    if (!redactedLogin.value("totp").toString().isEmpty())
-        redactedLogin.insert("totp", "[redacted]");
-    if (!redactedLogin.isEmpty())
-        redactedObject.insert("login", redactedLogin);
-    return redactedObject;
-}
+    if (value.isString())
+        return value.toString();
+    if (value.isBool())
+        return value.toBool() ? QStringLiteral("true") : QStringLiteral("false");
+    if (value.isDouble())
+        return QString::number(value.toDouble());
 
-QString redactedJson(const QJsonObject& object)
-{
-    return QString::fromUtf8(QJsonDocument(redactedItemObject(object)).toJson(QJsonDocument::Indented)).trimmed();
+    return {};
 }
 
 QStringList loginUris(const QJsonObject& login)
@@ -104,6 +98,69 @@ QStringList loginUris(const QJsonObject& login)
     return uris;
 }
 
+VaultCardData cardDataFromObject(const QJsonObject& object)
+{
+    VaultCardData card;
+    card.cardholderName = object.value("cardholderName").toString();
+    card.brand = object.value("brand").toString();
+    card.number = object.value("number").toString();
+    card.expirationMonth = jsonScalarText(object.value("expMonth"));
+    card.expirationYear = jsonScalarText(object.value("expYear"));
+    card.securityCode = object.value("code").toString();
+    return card;
+}
+
+VaultIdentityData identityDataFromObject(const QJsonObject& object)
+{
+    VaultIdentityData identity;
+    identity.title = object.value("title").toString();
+    identity.firstName = object.value("firstName").toString();
+    identity.middleName = object.value("middleName").toString();
+    identity.lastName = object.value("lastName").toString();
+    identity.company = object.value("company").toString();
+    identity.email = object.value("email").toString();
+    identity.phone = object.value("phone").toString();
+    identity.username = object.value("username").toString();
+    identity.address1 = object.value("address1").toString();
+    identity.address2 = object.value("address2").toString();
+    identity.address3 = object.value("address3").toString();
+    identity.city = object.value("city").toString();
+    identity.state = object.value("state").toString();
+    identity.postalCode = object.value("postalCode").toString();
+    identity.country = object.value("country").toString();
+    identity.socialSecurityNumber = object.value("ssn").toString();
+    identity.passportNumber = object.value("passportNumber").toString();
+    identity.licenseNumber = object.value("licenseNumber").toString();
+    return identity;
+}
+
+VaultSshKeyData sshKeyDataFromObject(const QJsonObject& object)
+{
+    VaultSshKeyData sshKey;
+    sshKey.privateKey = object.value("privateKey").toString();
+    sshKey.publicKey = object.value("publicKey").toString();
+    sshKey.fingerprint = object.value("fingerprint").toString();
+    return sshKey;
+}
+
+QVector<VaultCustomField> customFieldsFromArray(const QJsonArray& array)
+{
+    QVector<VaultCustomField> fields;
+    fields.reserve(array.size());
+
+    for (const QJsonValue& value : array) {
+        const QJsonObject object = value.toObject();
+        VaultCustomField field;
+        field.name = object.value("name").toString();
+        field.value = jsonScalarText(object.value("value"));
+        field.typeCode = object.value("type").toInt();
+        if (!field.name.isEmpty() || !field.value.isEmpty())
+            fields.push_back(field);
+    }
+
+    return fields;
+}
+
 VaultItem vaultItemFromObject(const QJsonObject& object)
 {
     const QJsonObject login = object.value("login").toObject();
@@ -116,6 +173,10 @@ VaultItem vaultItemFromObject(const QJsonObject& object)
     item.username = login.value("username").toString();
     item.password = login.value("password").toString();
     item.totp = login.value("totp").toString();
+    item.card = cardDataFromObject(object.value("card").toObject());
+    item.identity = identityDataFromObject(object.value("identity").toObject());
+    item.sshKey = sshKeyDataFromObject(object.value("sshKey").toObject());
+    item.customFields = customFieldsFromArray(object.value("fields").toArray());
     item.notes = object.value("notes").toString();
     item.folderId = object.value("folderId").toString();
     item.organizationId = object.value("organizationId").toString();
@@ -124,7 +185,6 @@ VaultItem vaultItemFromObject(const QJsonObject& object)
     item.creationDate = object.value("creationDate").toString();
     item.deletedDate = object.value("deletedDate").toString();
     item.uris = loginUris(login);
-    item.rawJson = redactedJson(object);
     return item;
 }
 
@@ -1002,10 +1062,15 @@ BwClient::ItemDetails BwClient::detailsFromVaultItem(const VaultItem& item)
     ItemDetails details;
     details.id = item.id;
     details.name = item.name;
+    details.typeCode = item.typeCode;
     details.type = item.type;
     details.username = item.username;
     details.password = item.password;
     details.totp = item.totp;
+    details.card = item.card;
+    details.identity = item.identity;
+    details.sshKey = item.sshKey;
+    details.customFields = item.customFields;
     details.notes = item.notes;
     details.folderId = item.folderId;
     details.organizationId = item.organizationId;
@@ -1014,7 +1079,6 @@ BwClient::ItemDetails BwClient::detailsFromVaultItem(const VaultItem& item)
     details.creationDate = item.creationDate;
     details.deletedDate = item.deletedDate;
     details.uris = item.uris;
-    details.rawJson = item.rawJson;
     return details;
 }
 

@@ -9,6 +9,52 @@
 
 class QWidget;
 
+struct VaultCardData
+{
+    QString cardholderName;
+    QString brand;
+    QString number;
+    QString expirationMonth;
+    QString expirationYear;
+    QString securityCode;
+};
+
+struct VaultIdentityData
+{
+    QString title;
+    QString firstName;
+    QString middleName;
+    QString lastName;
+    QString company;
+    QString email;
+    QString phone;
+    QString username;
+    QString address1;
+    QString address2;
+    QString address3;
+    QString city;
+    QString state;
+    QString postalCode;
+    QString country;
+    QString socialSecurityNumber;
+    QString passportNumber;
+    QString licenseNumber;
+};
+
+struct VaultSshKeyData
+{
+    QString privateKey;
+    QString publicKey;
+    QString fingerprint;
+};
+
+struct VaultCustomField
+{
+    QString name;
+    QString value;
+    int typeCode = 0;
+};
+
 struct VaultItem
 {
     QString id;
@@ -18,6 +64,10 @@ struct VaultItem
     QString username;
     QString password;
     QString totp;
+    VaultCardData card;
+    VaultIdentityData identity;
+    VaultSshKeyData sshKey;
+    QVector<VaultCustomField> customFields;
     QString notes;
     QString folderId;
     QString organizationId;
@@ -26,7 +76,6 @@ struct VaultItem
     QString creationDate;
     QString deletedDate;
     QStringList uris;
-    QString rawJson;
 };
 
 class BwClient
@@ -51,10 +100,15 @@ public:
     {
         QString id;
         QString name;
+        int typeCode = 0;
         QString type;
         QString username;
         QString password;
         QString totp;
+        VaultCardData card;
+        VaultIdentityData identity;
+        VaultSshKeyData sshKey;
+        QVector<VaultCustomField> customFields;
         QString notes;
         QString folderId;
         QString organizationId;
@@ -63,7 +117,6 @@ public:
         QString creationDate;
         QString deletedDate;
         QStringList uris;
-        QString rawJson;
     };
 
     BwClient();

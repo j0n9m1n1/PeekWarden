@@ -644,6 +644,31 @@ QString defaultServerUrlForMode(const QString& mode)
     return "https://vault.bitwarden.com";
 }
 
+QString maskedSecretValue(const QString& value, int visibleSuffixLength = 0)
+{
+    if (value.isEmpty())
+        return {};
+
+    if (value.size() <= visibleSuffixLength)
+        visibleSuffixLength = 0;
+
+    const int hiddenLength = value.size() - visibleSuffixLength;
+    const int maskLength = qBound(4, hiddenLength, 16);
+    QString masked(maskLength, QChar(0x2022));
+    if (visibleSuffixLength > 0)
+        masked += QStringLiteral(" ") + value.right(visibleSuffixLength);
+    return masked;
+}
+
+QGridLayout* makeDetailForm()
+{
+    auto* form = new QGridLayout;
+    form->setHorizontalSpacing(10);
+    form->setVerticalSpacing(9);
+    form->setColumnStretch(1, 1);
+    return form;
+}
+
 QString displayName(const VaultItem& item)
 {
     const QString name = item.name.isEmpty() ? uiText("(이름 없는 항목)", "(unnamed item)") : item.name;
@@ -3018,50 +3043,132 @@ void QuickWindow::showItemDetails(QListWidgetItem* item)
                 titleLayout->addWidget(idLabel);
             }
 
-            QVBoxLayout* credentialsLayout = makeCard(contentLayout, uiText("로그인 정보", "Login credentials"));
-            auto* credentialsForm = new QGridLayout;
-            credentialsForm->setHorizontalSpacing(10);
-            credentialsForm->setVerticalSpacing(9);
-            credentialsForm->setColumnStretch(1, 1);
-            int row = 0;
-            row = addDetailRow(credentialsForm, row, uiText("사용자 이름", "Username"), details.username, details.username);
-            row = addDetailRow(credentialsForm,
-                row,
-                uiText("비밀번호", "Password"),
-                details.password.isEmpty() ? QString() : QString(details.password.size(), QChar(0x2022)),
-                details.password,
-                true);
-            if (!details.totp.isEmpty()) {
-                QWidget* rowParent = credentialsLayout->parentWidget();
-                auto* labelWidget = new QLabel(uiText("TOTP", "TOTP"), rowParent);
-                labelWidget->setObjectName("detailLabel");
-                auto* valueWidget = new QLabel(QString(6, QChar(0x2022)), rowParent);
-                valueWidget->setObjectName("detailValue");
-                auto* copyButton = new QPushButton(uiText("코드 복사", "Copy code"), rowParent);
-                QObject::connect(copyButton, &QPushButton::clicked, copyButton, [this, itemId, copyButton] {
-                    QString errorMessage;
-                    const QString totp = totpCodeForItem(itemId, &errorMessage);
-                    if (totp.isEmpty()) {
-                        copyButton->setToolTip(errorMessage);
-                        return;
-                    }
+            if (details.typeCode == 1) {
+                QVBoxLayout* credentialsLayout = makeCard(contentLayout, uiText("로그인 정보", "Login credentials"));
+                QGridLayout* credentialsForm = makeDetailForm();
+                int row = 0;
+                row = addDetailRow(credentialsForm, row, uiText("사용자 이름", "Username"), details.username, details.username);
+                row = addDetailRow(credentialsForm,
+                    row,
+                    uiText("비밀번호", "Password"),
+                    maskedSecretValue(details.password),
+                    details.password,
+                    true);
+                if (!details.totp.isEmpty()) {
+                    QWidget* rowParent = credentialsLayout->parentWidget();
+                    auto* labelWidget = new QLabel(uiText("TOTP", "TOTP"), rowParent);
+                    labelWidget->setObjectName("detailLabel");
+                    auto* valueWidget = new QLabel(maskedSecretValue(details.totp), rowParent);
+                    valueWidget->setObjectName("detailValue");
+                    auto* copyButton = new QPushButton(uiText("코드 복사", "Copy code"), rowParent);
+                    QObject::connect(copyButton, &QPushButton::clicked, copyButton, [this, itemId, copyButton] {
+                        QString errorMessage;
+                        const QString totp = totpCodeForItem(itemId, &errorMessage);
+                        if (totp.isEmpty()) {
+                            copyButton->setToolTip(errorMessage);
+                            return;
+                        }
 
-                    copyToClipboard(totp, true);
-                    copyButton->setText(uiText("복사됨", "Copied"));
-                    QTimer::singleShot(1200, copyButton, [copyButton] {
-                        copyButton->setText(uiText("코드 복사", "Copy code"));
+                        copyToClipboard(totp, true);
+                        copyButton->setText(uiText("복사됨", "Copied"));
+                        QTimer::singleShot(1200, copyButton, [copyButton] {
+                            copyButton->setText(uiText("코드 복사", "Copy code"));
+                        });
                     });
-                });
-                credentialsForm->addWidget(labelWidget, row, 0);
-                credentialsForm->addWidget(valueWidget, row, 1);
-                credentialsForm->addWidget(copyButton, row, 2);
-                ++row;
+                    credentialsForm->addWidget(labelWidget, row, 0);
+                    credentialsForm->addWidget(valueWidget, row, 1);
+                    credentialsForm->addWidget(copyButton, row, 2);
+                    ++row;
+                }
+                if (row == 0)
+                    addDetailRow(credentialsForm, row, uiText("상태", "Status"), uiText("로그인 필드 없음", "No login fields"));
+                credentialsLayout->addLayout(credentialsForm);
+            } else if (details.typeCode == 3) {
+                QVBoxLayout* cardLayout = makeCard(contentLayout, uiText("카드 정보", "Card details"));
+                QGridLayout* cardForm = makeDetailForm();
+                int row = 0;
+                row = addDetailRow(cardForm, row, uiText("카드 소유자", "Cardholder"), details.card.cardholderName, details.card.cardholderName);
+                row = addDetailRow(cardForm, row, uiText("브랜드", "Brand"), details.card.brand, details.card.brand);
+                row = addDetailRow(cardForm,
+                    row,
+                    uiText("카드 번호", "Card number"),
+                    maskedSecretValue(details.card.number, 4),
+                    details.card.number,
+                    true);
+                QStringList expirationParts;
+                if (!details.card.expirationMonth.isEmpty())
+                    expirationParts.push_back(details.card.expirationMonth);
+                if (!details.card.expirationYear.isEmpty())
+                    expirationParts.push_back(details.card.expirationYear);
+                const QString expiration = expirationParts.join(QLatin1Char('/'));
+                row = addDetailRow(cardForm, row, uiText("만료일", "Expiration"), expiration, expiration);
+                row = addDetailRow(cardForm,
+                    row,
+                    uiText("보안 코드", "Security code"),
+                    maskedSecretValue(details.card.securityCode),
+                    details.card.securityCode,
+                    true);
+                if (row == 0)
+                    addDetailRow(cardForm, row, uiText("상태", "Status"), uiText("카드 필드 없음", "No card fields"));
+                cardLayout->addLayout(cardForm);
+            } else if (details.typeCode == 4) {
+                QVBoxLayout* identityLayout = makeCard(contentLayout, uiText("신원 정보", "Identity details"));
+                QGridLayout* identityForm = makeDetailForm();
+                int row = 0;
+                row = addDetailRow(identityForm, row, uiText("호칭", "Title"), details.identity.title, details.identity.title);
+                row = addDetailRow(identityForm, row, uiText("이름", "First name"), details.identity.firstName, details.identity.firstName);
+                row = addDetailRow(identityForm, row, uiText("중간 이름", "Middle name"), details.identity.middleName, details.identity.middleName);
+                row = addDetailRow(identityForm, row, uiText("성", "Last name"), details.identity.lastName, details.identity.lastName);
+                row = addDetailRow(identityForm, row, uiText("회사", "Company"), details.identity.company, details.identity.company);
+                row = addDetailRow(identityForm, row, uiText("사용자 이름", "Username"), details.identity.username, details.identity.username);
+                row = addDetailRow(identityForm, row, uiText("이메일", "Email"), details.identity.email, details.identity.email);
+                row = addDetailRow(identityForm, row, uiText("전화번호", "Phone"), details.identity.phone, details.identity.phone);
+                row = addDetailRow(identityForm, row, uiText("주소 1", "Address 1"), details.identity.address1, details.identity.address1);
+                row = addDetailRow(identityForm, row, uiText("주소 2", "Address 2"), details.identity.address2, details.identity.address2);
+                row = addDetailRow(identityForm, row, uiText("주소 3", "Address 3"), details.identity.address3, details.identity.address3);
+                row = addDetailRow(identityForm, row, uiText("도시", "City"), details.identity.city, details.identity.city);
+                row = addDetailRow(identityForm, row, uiText("주/도", "State / Province"), details.identity.state, details.identity.state);
+                row = addDetailRow(identityForm, row, uiText("우편번호", "Postal code"), details.identity.postalCode, details.identity.postalCode);
+                row = addDetailRow(identityForm, row, uiText("국가", "Country"), details.identity.country, details.identity.country);
+                row = addDetailRow(identityForm,
+                    row,
+                    uiText("주민/사회보장 번호", "Social security number"),
+                    maskedSecretValue(details.identity.socialSecurityNumber, 4),
+                    details.identity.socialSecurityNumber,
+                    true);
+                row = addDetailRow(identityForm,
+                    row,
+                    uiText("여권 번호", "Passport number"),
+                    maskedSecretValue(details.identity.passportNumber, 4),
+                    details.identity.passportNumber,
+                    true);
+                row = addDetailRow(identityForm,
+                    row,
+                    uiText("면허 번호", "License number"),
+                    maskedSecretValue(details.identity.licenseNumber, 4),
+                    details.identity.licenseNumber,
+                    true);
+                if (row == 0)
+                    addDetailRow(identityForm, row, uiText("상태", "Status"), uiText("신원 필드 없음", "No identity fields"));
+                identityLayout->addLayout(identityForm);
+            } else if (details.typeCode == 5) {
+                QVBoxLayout* sshLayout = makeCard(contentLayout, uiText("SSH 키", "SSH key"));
+                QGridLayout* sshForm = makeDetailForm();
+                int row = 0;
+                row = addDetailRow(sshForm, row, uiText("공개 키", "Public key"), details.sshKey.publicKey, details.sshKey.publicKey);
+                row = addDetailRow(sshForm, row, uiText("지문", "Fingerprint"), details.sshKey.fingerprint, details.sshKey.fingerprint);
+                row = addDetailRow(sshForm,
+                    row,
+                    uiText("개인 키", "Private key"),
+                    maskedSecretValue(details.sshKey.privateKey),
+                    details.sshKey.privateKey,
+                    true);
+                if (row == 0)
+                    addDetailRow(sshForm, row, uiText("상태", "Status"), uiText("SSH 키 필드 없음", "No SSH key fields"));
+                sshLayout->addLayout(sshForm);
             }
-            if (row == 0)
-                row = addDetailRow(credentialsForm, row, uiText("상태", "Status"), uiText("로그인 필드 없음", "No login fields"));
-            credentialsLayout->addLayout(credentialsForm);
 
-            if (!details.uris.isEmpty()) {
+            if (details.typeCode == 1 && !details.uris.isEmpty()) {
                 QVBoxLayout* urisLayout = makeCard(contentLayout, uiText("웹 사이트", "Websites"));
                 auto* uriText = new QLabel(linkedWebsiteText(details.uris), urisLayout->parentWidget());
                 uriText->setObjectName("detailValue");
@@ -3075,11 +3182,41 @@ void QuickWindow::showItemDetails(QListWidgetItem* item)
                 urisLayout->addWidget(uriText);
             }
 
+            if (!details.customFields.isEmpty()) {
+                QVBoxLayout* customLayout = makeCard(contentLayout, uiText("사용자 지정 필드", "Custom fields"));
+                QGridLayout* customForm = makeDetailForm();
+                int customRow = 0;
+                for (const VaultCustomField& field : details.customFields) {
+                    const bool sensitive = field.typeCode == 1;
+                    QString displayValue = sensitive ? maskedSecretValue(field.value) : field.value;
+                    if (field.typeCode == 2) {
+                        const bool enabled = field.value.compare(QStringLiteral("true"), Qt::CaseInsensitive) == 0;
+                        displayValue = enabled ? uiText("예", "Yes") : uiText("아니요", "No");
+                    }
+                    customRow = addDetailRow(
+                        customForm,
+                        customRow,
+                        field.name.isEmpty() ? uiText("사용자 지정", "Custom") : field.name,
+                        displayValue,
+                        field.value,
+                        sensitive);
+                }
+                customLayout->addLayout(customForm);
+            }
+
+            if (!details.notes.isEmpty()) {
+                const QString notesTitle = details.typeCode == 2
+                    ? uiText("보안 메모", "Secure note")
+                    : uiText("메모", "Notes");
+                QVBoxLayout* notesLayout = makeCard(contentLayout, notesTitle);
+                auto* notesEdit = new QPlainTextEdit(details.notes, notesLayout->parentWidget());
+                notesEdit->setReadOnly(true);
+                notesEdit->setMinimumHeight(details.typeCode == 2 ? 180 : 90);
+                notesLayout->addWidget(notesEdit);
+            }
+
             QVBoxLayout* metaLayout = makeCard(contentLayout, uiText("메타데이터", "Metadata"));
-            auto* metaForm = new QGridLayout;
-            metaForm->setHorizontalSpacing(10);
-            metaForm->setVerticalSpacing(9);
-            metaForm->setColumnStretch(1, 1);
+            QGridLayout* metaForm = makeDetailForm();
             int metaRow = 0;
             metaRow = addDetailRow(metaForm, metaRow, uiText("유형", "Type"), details.type);
             metaRow = addDetailRow(metaForm, metaRow, QStringLiteral("ID"), details.id, details.id);
@@ -3090,21 +3227,6 @@ void QuickWindow::showItemDetails(QListWidgetItem* item)
             metaRow = addDetailRow(metaForm, metaRow, uiText("수정일", "Updated"), details.revisionDate);
             addDetailRow(metaForm, metaRow, uiText("삭제일", "Deleted"), details.deletedDate);
             metaLayout->addLayout(metaForm);
-
-            if (!details.notes.isEmpty()) {
-                QVBoxLayout* notesLayout = makeCard(contentLayout, uiText("메모", "Notes"));
-                auto* notesEdit = new QPlainTextEdit(details.notes, notesLayout->parentWidget());
-                notesEdit->setReadOnly(true);
-                notesEdit->setMinimumHeight(90);
-                notesLayout->addWidget(notesEdit);
-            }
-
-            QVBoxLayout* rawLayout = makeCard(contentLayout, uiText("원본 JSON", "Raw JSON"));
-            auto* rawJson = new QPlainTextEdit(details.rawJson, rawLayout->parentWidget());
-            rawJson->setReadOnly(true);
-            rawJson->setLineWrapMode(QPlainTextEdit::NoWrap);
-            rawJson->setMinimumHeight(180);
-            rawLayout->addWidget(rawJson);
 
             contentLayout->addStretch(1);
             watcher->deleteLater();

@@ -6,7 +6,7 @@ on:
       qt_version:
         description: Qt version to build with
         required: true
-        default: 6.8.3
+        default: 6.11.1
   push:
     tags:
       - "v*"
@@ -16,11 +16,11 @@ permissions:
 
 env:
   APP_NAME: PeekWarden
-  QT_VERSION: ${{ github.event.inputs.qt_version || '6.8.3' }}
+  QT_VERSION: ${{ github.event.inputs.qt_version || '6.11.1' }}
 
 jobs:
   windows:
-    name: Windows x64
+    name: Windows x64 / MinGW 13.1
     runs-on: windows-latest
 
     steps:
@@ -33,12 +33,10 @@ jobs:
           version: ${{ env.QT_VERSION }}
           host: windows
           target: desktop
-          arch: win64_msvc2022_64
+          arch: win64_mingw
           archives: qtbase qttools
+          tools: tools_mingw1310,qt.tools.win64_mingw1310
           cache: true
-
-      - name: Setup MSVC
-        uses: ilammy/msvc-dev-cmd@v1
 
       - name: Configure
         shell: pwsh
@@ -60,6 +58,7 @@ jobs:
             "-B", "build",
             "-G", "Ninja",
             "-DCMAKE_BUILD_TYPE=Release",
+            "-DCMAKE_CXX_COMPILER=g++.exe",
             "-DCMAKE_PREFIX_PATH=$qtPrefix"
           )
 
