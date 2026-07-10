@@ -492,24 +492,30 @@ bool BwClient::loginWithCredentials(const QString& email,
         return false;
     }
 
-    QStringList arguments = {"login", trimmedEmail, passwordCopy, "--raw", "--nointeraction"};
-    QString displayCommand = QString("login %1 <password> --raw --nointeraction").arg(trimmedEmail);
+    if (!trimmedCode.isEmpty() && trimmedMethod.isEmpty()) {
+        passwordCopy.fill(QChar('\0'));
+        setError(errorMessage, uiText("2단계 코드를 입력한 경우 2단계 방식도 선택하세요.",
+                                      "Choose a two-step method when entering a two-step code."));
+        return false;
+    }
+
+    QByteArray passwordInput = passwordCopy.toUtf8();
+    passwordCopy.fill(QChar('\0'));
+
+    QProcessEnvironment extraEnvironment;
+    extraEnvironment.insert("BW_PASSWORD", QString::fromUtf8(passwordInput));
+
+    QStringList arguments = {"login", trimmedEmail, "--passwordenv", "BW_PASSWORD", "--raw", "--nointeraction"};
+    QString displayCommand = QString("login %1 --passwordenv BW_PASSWORD --raw --nointeraction").arg(trimmedEmail);
 
     if (!trimmedCode.isEmpty()) {
-        if (trimmedMethod.isEmpty()) {
-            passwordCopy.fill(QChar('\0'));
-            setError(errorMessage, uiText("2단계 코드를 입력한 경우 2단계 방식도 선택하세요.",
-                                          "Choose a two-step method when entering a two-step code."));
-            return false;
-        }
-
         arguments << "--method" << trimmedMethod << "--code" << trimmedCode;
         displayCommand += " --method " + trimmedMethod + " --code <code>";
     }
 
-    const CommandResult result = run(arguments, {}, 60000);
-    arguments[2].fill(QChar('\0'));
-    passwordCopy.fill(QChar('\0'));
+    const CommandResult result = run(arguments, {}, 60000, extraEnvironment);
+    extraEnvironment.insert("BW_PASSWORD", QString());
+    passwordInput.fill('\0');
 
     if (!result.ok()) {
         setError(errorMessage, describeCommandError(m_program, displayCommand, result));
@@ -640,24 +646,30 @@ bool BwClient::login(QWidget* parent, QString* errorMessage)
         return false;
     }
 
-    QStringList arguments = {"login", email, password, "--raw", "--nointeraction"};
-    QString displayCommand = QString("login %1 <password> --raw --nointeraction").arg(email);
+    if (!code.isEmpty() && method.isEmpty()) {
+        password.fill(QChar('\0'));
+        setError(errorMessage, uiText("2단계 코드를 입력한 경우 2단계 방식도 선택하세요.",
+                                      "Choose a two-step method when entering a two-step code."));
+        return false;
+    }
+
+    QByteArray passwordInput = password.toUtf8();
+    password.fill(QChar('\0'));
+
+    QProcessEnvironment extraEnvironment;
+    extraEnvironment.insert("BW_PASSWORD", QString::fromUtf8(passwordInput));
+
+    QStringList arguments = {"login", email, "--passwordenv", "BW_PASSWORD", "--raw", "--nointeraction"};
+    QString displayCommand = QString("login %1 --passwordenv BW_PASSWORD --raw --nointeraction").arg(email);
 
     if (!code.isEmpty()) {
-        if (method.isEmpty()) {
-            password.fill(QChar('\0'));
-            setError(errorMessage, uiText("2단계 코드를 입력한 경우 2단계 방식도 선택하세요.",
-                                          "Choose a two-step method when entering a two-step code."));
-            return false;
-        }
-
         arguments << "--method" << method << "--code" << code;
         displayCommand += " --method " + method + " --code <code>";
     }
 
-    const CommandResult result = run(arguments, {}, 60000);
-    arguments[2].fill(QChar('\0'));
-    password.fill(QChar('\0'));
+    const CommandResult result = run(arguments, {}, 60000, extraEnvironment);
+    extraEnvironment.insert("BW_PASSWORD", QString());
+    passwordInput.fill('\0');
 
     if (!result.ok()) {
         setError(errorMessage, describeCommandError(m_program, displayCommand, result));
