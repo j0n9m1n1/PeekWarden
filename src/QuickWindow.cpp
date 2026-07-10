@@ -27,6 +27,7 @@
 #include <QMenu>
 #include <QMessageBox>
 #include <QMessageAuthenticationCode>
+#include <QMimeData>
 #include <QMouseEvent>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
@@ -1445,6 +1446,8 @@ void QuickWindow::showSettings()
 
 bool QuickWindow::lockVault(QString* errorMessage)
 {
+    ++m_vaultGeneration;
+    closeDetailWindows();
     const bool locked = m_bw.lock(errorMessage);
     m_refreshTimer.stop();
     m_itemsReady = false;
@@ -1464,6 +1467,8 @@ bool QuickWindow::lockVault(QString* errorMessage)
 
 bool QuickWindow::logoutVault(QString* errorMessage)
 {
+    ++m_vaultGeneration;
+    closeDetailWindows();
     const bool loggedOut = m_bw.logout(errorMessage);
     m_refreshTimer.stop();
     m_itemsReady = false;
@@ -2041,8 +2046,10 @@ void QuickWindow::startItemLoad(bool forceRefresh, bool quiet)
                 ? uiText("Bitwarden 동기화 중...", "Syncing Bitwarden...")
                 : uiText("Bitwarden 항목 불러오는 중...", "Loading Bitwarden items..."));
 
-    m_itemsWatcher.setFuture(QtConcurrent::run([this, forceRefresh] {
+    const quint64 generation = m_vaultGeneration;
+    m_itemsWatcher.setFuture(QtConcurrent::run([this, forceRefresh, generation] {
         ItemsResult result;
+        result.generation = generation;
         if (forceRefresh) {
             QString syncError;
             if (!m_bw.sync(&syncError)) {
@@ -2064,6 +2071,11 @@ void QuickWindow::handleItemsFinished()
     m_syncing = false;
     if (!quiet)
         setBusy(false);
+
+    if (result.generation != m_vaultGeneration || !m_bw.hasSession()) {
+        updateFooter();
+        return;
+    }
 
     if (!result.errorMessage.isEmpty()) {
         if (!quiet) {
@@ -2266,8 +2278,10 @@ void QuickWindow::prepareVault(bool interactive)
         m_search->setEnabled(false);
     }
 
-    m_prepareWatcher.setFuture(QtConcurrent::run([this] {
+    const quint64 generation = m_vaultGeneration;
+    m_prepareWatcher.setFuture(QtConcurrent::run([this, generation] {
         PrepareResult result;
+        result.generation = generation;
         QString errorMessage;
 
         result.available = m_bw.isAvailable(&errorMessage);
@@ -2290,6 +2304,9 @@ void QuickWindow::handlePrepareFinished()
 
     if (!preloading)
         setBusy(false);
+
+    if (result.generation != m_vaultGeneration)
+        return;
 
     if (!result.available) {
         if (preloading)
@@ -2711,14 +2728,21 @@ void QuickWindow::submitAuth()
             ? uiText("Bitwarden 로그인 중...", "Logging in to Bitwarden...")
             : uiText("Bitwarden 잠금 해제 중...", "Unlocking Bitwarden..."));
 
-    m_authWatcher.setFuture(QtConcurrent::run([this, loginMode, serverUrl, email, password, method, code] {
+    const quint64 generation = m_vaultGeneration;
+    m_authWatcher.setFuture(QtConcurrent::run([this, loginMode, serverUrl, email, password, method, code, generation] {
         AuthResult result;
+        result.generation = generation;
         result.loginMode = loginMode;
         QString errorMessage;
 
         if (loginMode) {
-            result.ok = m_bw.configureServer(serverUrl, &errorMessage)
-                && m_bw.loginWithCredentials(email, password, method, code, &errorMessage);
+            result.ok = m_bw.loginWithCredentials(
+                serverUrl,
+                email,
+                password,
+                method,
+                code,
+                &errorMessage);
         } else {
             result.ok = m_bw.unlockWithPassword(password, &errorMessage);
         }
@@ -2738,12 +2762,16 @@ void QuickWindow::handleAuthFinished()
     updateAuthTexts();
     m_authPassword->clear();
 
+    if (result.generation != m_vaultGeneration)
+        return;
+
     if (!result.ok) {
         setStatus(result.errorMessage);
         m_authPassword->setFocus();
         return;
     }
 
+    ++m_vaultGeneration;
     m_authCode->clear();
     m_itemsReady = false;
     m_cachedItems.clear();
@@ -2824,7 +2852,7 @@ void QuickWindow::copyTotp(QListWidgetItem* item)
 
     if (!totp.isEmpty()) {
         recordRecentItem(itemId);
-        copyTextAndHide(totp, false);
+        copyTextAndHide(totp, true);
     }
 }
 
@@ -2839,6 +2867,7 @@ void QuickWindow::showItemDetails(QListWidgetItem* item)
     recordRecentItem(itemId);
 
     const QString fallbackTitle = item->text();
+    const quint64 generation = m_vaultGeneration;
     const VaultItem* cachedItem = cachedItemById(itemId);
     const bool hasCachedDetails = cachedItem != nullptr;
     const BwClient::ItemDetails cachedDetails = hasCachedDetails
@@ -2847,6 +2876,7 @@ void QuickWindow::showItemDetails(QListWidgetItem* item)
 
     struct DetailsResult
     {
+        quint64 generation = 0;
         BwClient::ItemDetails details;
         QString errorMessage;
     };
@@ -2914,11 +2944,12 @@ void QuickWindow::showItemDetails(QListWidgetItem* item)
         return cardLayout;
     };
 
-    const auto addDetailRow = [dialog](QGridLayout* form,
+    const auto addDetailRow = [dialog, this](QGridLayout* form,
                                    int row,
                                    const QString& label,
                                    const QString& value,
-                                   const QString& copyText = {}) {
+                                   const QString& copyText = {},
+                                   bool sensitive = false) {
         if (value.isEmpty())
             return row;
 
@@ -2930,8 +2961,8 @@ void QuickWindow::showItemDetails(QListWidgetItem* item)
         valueWidget->setTextInteractionFlags(Qt::TextSelectableByMouse);
         auto* copyButton = new QPushButton(uiText("복사", "Copy"), dialog);
         copyButton->setEnabled(!copyText.isEmpty());
-        QObject::connect(copyButton, &QPushButton::clicked, dialog, [copyText] {
-            QApplication::clipboard()->setText(copyText);
+        QObject::connect(copyButton, &QPushButton::clicked, dialog, [this, copyText, sensitive] {
+            copyToClipboard(copyText, sensitive);
         });
         form->addWidget(labelWidget, row, 0);
         form->addWidget(valueWidget, row, 1);
@@ -2948,9 +2979,17 @@ void QuickWindow::showItemDetails(QListWidgetItem* item)
             makeCard,
             addDetailRow,
             fallbackTitle,
+            dialog,
             this,
             itemId] {
             const DetailsResult result = watcher->result();
+
+            if (result.generation != m_vaultGeneration || !m_bw.hasSession()) {
+                watcher->deleteLater();
+                dialog->close();
+                return;
+            }
+
             loadingLabel->hide();
             loadingBar->hide();
             if (QLayoutItem* item = contentLayout->takeAt(contentLayout->count() - 1))
@@ -2990,7 +3029,8 @@ void QuickWindow::showItemDetails(QListWidgetItem* item)
                 row,
                 uiText("비밀번호", "Password"),
                 details.password.isEmpty() ? QString() : QString(details.password.size(), QChar(0x2022)),
-                details.password);
+                details.password,
+                true);
             if (!details.totp.isEmpty()) {
                 QWidget* rowParent = credentialsLayout->parentWidget();
                 auto* labelWidget = new QLabel(uiText("TOTP", "TOTP"), rowParent);
@@ -3006,7 +3046,7 @@ void QuickWindow::showItemDetails(QListWidgetItem* item)
                         return;
                     }
 
-                    QApplication::clipboard()->setText(totp);
+                    copyToClipboard(totp, true);
                     copyButton->setText(uiText("복사됨", "Copied"));
                     QTimer::singleShot(1200, copyButton, [copyButton] {
                         copyButton->setText(uiText("코드 복사", "Copy code"));
@@ -3070,8 +3110,9 @@ void QuickWindow::showItemDetails(QListWidgetItem* item)
             watcher->deleteLater();
         });
 
-    watcher->setFuture(QtConcurrent::run([this, itemId, hasCachedDetails, cachedDetails] {
+    watcher->setFuture(QtConcurrent::run([this, itemId, hasCachedDetails, cachedDetails, generation] {
         DetailsResult result;
+        result.generation = generation;
         if (hasCachedDetails) {
             result.details = cachedDetails;
             return result;
@@ -3105,20 +3146,66 @@ void QuickWindow::showItemDetails(QListWidgetItem* item)
     dialog->activateWindow();
 }
 
-void QuickWindow::copyTextAndHide(const QString& text, bool clearAfterDelay)
+void QuickWindow::closeDetailWindows()
 {
-    preserveSearchState();
-    QApplication::clipboard()->setText(text);
-    hide();
+    const QWidgetList topLevelWidgets = QApplication::topLevelWidgets();
+    for (QWidget* widget : topLevelWidgets) {
+        if (widget && widget->property("peekwardenDetailWindow").toBool())
+            widget->close();
+    }
+}
 
-    if (!clearAfterDelay)
+void QuickWindow::copyToClipboard(const QString& text, bool sensitive)
+{
+    if (text.isEmpty())
         return;
 
-    QTimer::singleShot(30000, this, [text] {
-        QClipboard* clipboard = QApplication::clipboard();
-        if (clipboard && clipboard->text() == text)
-            clipboard->clear();
+    QClipboard* clipboard = QApplication::clipboard();
+    if (!clipboard)
+        return;
+
+    auto* mimeData = new QMimeData;
+    mimeData->setText(text);
+
+#ifdef Q_OS_WIN
+    if (sensitive) {
+        const QByteArray disabledFlag(sizeof(quint32), '\0');
+        mimeData->setData(
+            QStringLiteral("application/x-qt-windows-mime;value=\"CanIncludeInClipboardHistory\""),
+            disabledFlag);
+        mimeData->setData(
+            QStringLiteral("application/x-qt-windows-mime;value=\"CanUploadToCloudClipboard\""),
+            disabledFlag);
+    }
+#endif
+
+    clipboard->setMimeData(mimeData);
+    const quint64 clipboardGeneration = ++m_clipboardGeneration;
+
+    if (!sensitive)
+        return;
+
+    const QByteArray expectedHash = QCryptographicHash::hash(text.toUtf8(), QCryptographicHash::Sha256);
+    QTimer::singleShot(30000, this, [this, clipboardGeneration, expectedHash] {
+        QClipboard* currentClipboard = QApplication::clipboard();
+        if (!currentClipboard || clipboardGeneration != m_clipboardGeneration
+            || !currentClipboard->ownsClipboard()) {
+            return;
+        }
+
+        const QByteArray currentHash = QCryptographicHash::hash(
+            currentClipboard->text().toUtf8(),
+            QCryptographicHash::Sha256);
+        if (currentHash == expectedHash)
+            currentClipboard->clear();
     });
+}
+
+void QuickWindow::copyTextAndHide(const QString& text, bool sensitive)
+{
+    preserveSearchState();
+    copyToClipboard(text, sensitive);
+    hide();
 }
 
 void QuickWindow::setStatus(const QString& message)

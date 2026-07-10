@@ -17,6 +17,7 @@
 #include <QJsonParseError>
 #include <QLineEdit>
 #include <QLabel>
+#include <QMutexLocker>
 #include <QObject>
 #include <QProcess>
 #include <QProcessEnvironment>
@@ -339,16 +340,20 @@ BwClient::BwClient()
 
 bool BwClient::hasSession() const
 {
+    QMutexLocker<QMutex> stateLocker(&m_stateMutex);
     return !m_session.isEmpty();
 }
 
 QString BwClient::program() const
 {
+    QMutexLocker<QMutex> stateLocker(&m_stateMutex);
     return m_program;
 }
 
 void BwClient::reloadSettings()
 {
+    QMutexLocker<QRecursiveMutex> commandLocker(&m_commandMutex);
+    QMutexLocker<QMutex> stateLocker(&m_stateMutex);
     m_program = findBwProgram();
 
     if (AppSettings::credentialSessionStorageEnabled()) {
@@ -363,6 +368,9 @@ void BwClient::reloadSettings()
 
 void BwClient::clearSession()
 {
+    QMutexLocker<QRecursiveMutex> commandLocker(&m_commandMutex);
+    QMutexLocker<QMutex> stateLocker(&m_stateMutex);
+    m_session.fill(QChar('\0'));
     m_session.clear();
     deleteStoredSession();
 }
@@ -381,7 +389,7 @@ bool BwClient::isAvailable(QString* errorMessage) const
         QString("%1\n\n%2")
             .arg(uiText("Bitwarden CLI를 찾지 못했거나 실행하지 못했습니다.",
                          "Bitwarden CLI was not found or could not run."),
-                describeCommandError(m_program, arguments, result)));
+                describeCommandError(program(), arguments, result)));
     return false;
 }
 
@@ -392,7 +400,7 @@ BwClient::StatusInfo BwClient::statusInfo(QString* errorMessage) const
     const CommandResult result = run(arguments, {}, 5000);
 
     if (!result.ok()) {
-        setError(errorMessage, describeCommandError(m_program, arguments, result));
+        setError(errorMessage, describeCommandError(program(), arguments, result));
         return info;
     }
 
@@ -444,7 +452,7 @@ bool BwClient::configureServer(const QString& serverUrl, QString* errorMessage)
     const CommandResult result = run(arguments, {}, 10000);
 
     if (!result.ok()) {
-        setError(errorMessage, describeCommandError(m_program, arguments, result));
+        setError(errorMessage, describeCommandError(program(), arguments, result));
         return false;
     }
 
@@ -454,6 +462,8 @@ bool BwClient::configureServer(const QString& serverUrl, QString* errorMessage)
 
 bool BwClient::ensureSession(QWidget* parent, QString* errorMessage)
 {
+    QMutexLocker<QRecursiveMutex> commandLocker(&m_commandMutex);
+
     if (!isAvailable(errorMessage))
         return false;
 
@@ -474,12 +484,15 @@ bool BwClient::ensureSession(QWidget* parent, QString* errorMessage)
     return false;
 }
 
-bool BwClient::loginWithCredentials(const QString& email,
+bool BwClient::loginWithCredentials(const QString& serverUrl,
+    const QString& email,
     const QString& password,
     const QString& method,
     const QString& code,
     QString* errorMessage)
 {
+    QMutexLocker<QRecursiveMutex> commandLocker(&m_commandMutex);
+
     const QString trimmedEmail = email.trimmed();
     QString passwordCopy = password;
     const QString trimmedCode = code.trimmed();
@@ -496,6 +509,11 @@ bool BwClient::loginWithCredentials(const QString& email,
         passwordCopy.fill(QChar('\0'));
         setError(errorMessage, uiText("2단계 코드를 입력한 경우 2단계 방식도 선택하세요.",
                                       "Choose a two-step method when entering a two-step code."));
+        return false;
+    }
+
+    if (!configureServer(serverUrl, errorMessage)) {
+        passwordCopy.fill(QChar('\0'));
         return false;
     }
 
@@ -518,19 +536,23 @@ bool BwClient::loginWithCredentials(const QString& email,
     passwordInput.fill('\0');
 
     if (!result.ok()) {
-        setError(errorMessage, describeCommandError(m_program, displayCommand, result));
+        setError(errorMessage, describeCommandError(program(), displayCommand, result));
         return false;
     }
 
-    m_session = trimmedUtf8(result.standardOutput);
-    if (m_session.isEmpty()) {
+    const QString session = trimmedUtf8(result.standardOutput);
+    if (session.isEmpty()) {
         setError(errorMessage, uiText("Bitwarden CLI가 세션 키를 반환하지 않았습니다.",
                                       "Bitwarden CLI did not return a session key."));
         return false;
     }
 
+    {
+        QMutexLocker<QMutex> stateLocker(&m_stateMutex);
+        m_session = session;
+    }
     if (AppSettings::credentialSessionStorageEnabled())
-        writeStoredSession(m_session);
+        writeStoredSession(session);
 
     setError(errorMessage, {});
     return true;
@@ -538,6 +560,8 @@ bool BwClient::loginWithCredentials(const QString& email,
 
 bool BwClient::unlockWithPassword(const QString& password, QString* errorMessage)
 {
+    QMutexLocker<QRecursiveMutex> commandLocker(&m_commandMutex);
+
     QString passwordCopy = password;
     if (passwordCopy.isEmpty()) {
         setError(errorMessage, {});
@@ -556,19 +580,23 @@ bool BwClient::unlockWithPassword(const QString& password, QString* errorMessage
     passwordInput.fill('\0');
 
     if (!result.ok()) {
-        setError(errorMessage, describeCommandError(m_program, arguments, result));
+        setError(errorMessage, describeCommandError(program(), arguments, result));
         return false;
     }
 
-    m_session = trimmedUtf8(result.standardOutput);
-    if (m_session.isEmpty()) {
+    const QString session = trimmedUtf8(result.standardOutput);
+    if (session.isEmpty()) {
         setError(errorMessage, uiText("Bitwarden CLI가 세션 키를 반환하지 않았습니다.",
                                       "Bitwarden CLI did not return a session key."));
         return false;
     }
 
+    {
+        QMutexLocker<QMutex> stateLocker(&m_stateMutex);
+        m_session = session;
+    }
     if (AppSettings::credentialSessionStorageEnabled())
-        writeStoredSession(m_session);
+        writeStoredSession(session);
 
     setError(errorMessage, {});
     return true;
@@ -576,6 +604,8 @@ bool BwClient::unlockWithPassword(const QString& password, QString* errorMessage
 
 bool BwClient::login(QWidget* parent, QString* errorMessage)
 {
+    QMutexLocker<QRecursiveMutex> commandLocker(&m_commandMutex);
+
     QDialog dialog(parent);
     dialog.setWindowTitle(uiText("Bitwarden 로그인", "Bitwarden Login"));
     dialog.setModal(true);
@@ -672,19 +702,23 @@ bool BwClient::login(QWidget* parent, QString* errorMessage)
     passwordInput.fill('\0');
 
     if (!result.ok()) {
-        setError(errorMessage, describeCommandError(m_program, displayCommand, result));
+        setError(errorMessage, describeCommandError(program(), displayCommand, result));
         return false;
     }
 
-    m_session = trimmedUtf8(result.standardOutput);
-    if (m_session.isEmpty()) {
+    const QString session = trimmedUtf8(result.standardOutput);
+    if (session.isEmpty()) {
         setError(errorMessage, uiText("Bitwarden CLI가 세션 키를 반환하지 않았습니다.",
                                       "Bitwarden CLI did not return a session key."));
         return false;
     }
 
+    {
+        QMutexLocker<QMutex> stateLocker(&m_stateMutex);
+        m_session = session;
+    }
     if (AppSettings::credentialSessionStorageEnabled())
-        writeStoredSession(m_session);
+        writeStoredSession(session);
 
     setError(errorMessage, {});
     return true;
@@ -692,6 +726,8 @@ bool BwClient::login(QWidget* parent, QString* errorMessage)
 
 bool BwClient::unlock(QWidget* parent, QString* errorMessage)
 {
+    QMutexLocker<QRecursiveMutex> commandLocker(&m_commandMutex);
+
     bool accepted = false;
     QString password = QInputDialog::getText(
         parent,
@@ -718,18 +754,22 @@ bool BwClient::unlock(QWidget* parent, QString* errorMessage)
     passwordInput.fill('\0');
 
     if (!result.ok()) {
-        setError(errorMessage, describeCommandError(m_program, arguments, result));
+        setError(errorMessage, describeCommandError(program(), arguments, result));
         return false;
     }
 
-    m_session = trimmedUtf8(result.standardOutput);
-    if (m_session.isEmpty()) {
+    const QString session = trimmedUtf8(result.standardOutput);
+    if (session.isEmpty()) {
         setError(errorMessage, "Bitwarden CLI did not return a session key.");
         return false;
     }
 
+    {
+        QMutexLocker<QMutex> stateLocker(&m_stateMutex);
+        m_session = session;
+    }
     if (AppSettings::credentialSessionStorageEnabled())
-        writeStoredSession(m_session);
+        writeStoredSession(session);
 
     setError(errorMessage, {});
     return true;
@@ -737,14 +777,20 @@ bool BwClient::unlock(QWidget* parent, QString* errorMessage)
 
 bool BwClient::lock(QString* errorMessage)
 {
-    if (m_session.isEmpty()) {
+    QMutexLocker<QRecursiveMutex> commandLocker(&m_commandMutex);
+
+    if (!hasSession()) {
         setError(errorMessage, {});
         return true;
     }
 
     const QStringList arguments = {"lock"};
     const CommandResult result = run(arguments);
-    m_session.clear();
+    {
+        QMutexLocker<QMutex> stateLocker(&m_stateMutex);
+        m_session.fill(QChar('\0'));
+        m_session.clear();
+    }
     deleteStoredSession();
 
     if (!result.ok()) {
@@ -754,7 +800,7 @@ bool BwClient::lock(QString* errorMessage)
             return true;
         }
 
-        setError(errorMessage, describeCommandError(m_program, arguments, result));
+        setError(errorMessage, describeCommandError(program(), arguments, result));
         return false;
     }
 
@@ -764,13 +810,19 @@ bool BwClient::lock(QString* errorMessage)
 
 bool BwClient::logout(QString* errorMessage)
 {
+    QMutexLocker<QRecursiveMutex> commandLocker(&m_commandMutex);
+
     const QStringList arguments = {"logout", "--nointeraction"};
     const CommandResult result = run(arguments);
-    m_session.clear();
+    {
+        QMutexLocker<QMutex> stateLocker(&m_stateMutex);
+        m_session.fill(QChar('\0'));
+        m_session.clear();
+    }
     deleteStoredSession();
 
     if (!result.ok()) {
-        setError(errorMessage, describeCommandError(m_program, arguments, result));
+        setError(errorMessage, describeCommandError(program(), arguments, result));
         return false;
     }
 
@@ -784,7 +836,7 @@ bool BwClient::sync(QString* errorMessage) const
     const CommandResult result = run(arguments, {}, 30000);
 
     if (!result.ok()) {
-        setError(errorMessage, describeCommandError(m_program, arguments, result));
+        setError(errorMessage, describeCommandError(program(), arguments, result));
         return false;
     }
 
@@ -800,7 +852,7 @@ QVector<VaultItem> BwClient::listItems(QString* errorMessage) const
     const CommandResult result = run(arguments, {}, 20000);
 
     if (!result.ok()) {
-        setError(errorMessage, describeCommandError(m_program, arguments, result));
+        setError(errorMessage, describeCommandError(program(), arguments, result));
         return items;
     }
 
@@ -839,7 +891,7 @@ QVector<VaultItem> BwClient::search(const QString& keyword, QString* errorMessag
     const CommandResult result = run(arguments, {}, 20000);
 
     if (!result.ok()) {
-        setError(errorMessage, describeCommandError(m_program, arguments, result));
+        setError(errorMessage, describeCommandError(program(), arguments, result));
         return items;
     }
 
@@ -870,7 +922,7 @@ QString BwClient::getPassword(const QString& itemId, QString* errorMessage) cons
     const CommandResult result = run(arguments);
 
     if (!result.ok()) {
-        setError(errorMessage, describeCommandError(m_program, arguments, result));
+        setError(errorMessage, describeCommandError(program(), arguments, result));
         return {};
     }
 
@@ -884,7 +936,7 @@ QString BwClient::getUsername(const QString& itemId, QString* errorMessage) cons
     const CommandResult result = run(arguments);
 
     if (!result.ok()) {
-        setError(errorMessage, describeCommandError(m_program, arguments, result));
+        setError(errorMessage, describeCommandError(program(), arguments, result));
         return {};
     }
 
@@ -910,7 +962,7 @@ QString BwClient::getTotp(const QString& itemId, QString* errorMessage) const
     const CommandResult result = run(arguments);
 
     if (!result.ok()) {
-        setError(errorMessage, describeCommandError(m_program, arguments, result));
+        setError(errorMessage, describeCommandError(program(), arguments, result));
         return {};
     }
 
@@ -925,7 +977,7 @@ BwClient::ItemDetails BwClient::getItemDetails(const QString& itemId, QString* e
     const CommandResult result = run(arguments, {}, 15000);
 
     if (!result.ok()) {
-        setError(errorMessage, describeCommandError(m_program, arguments, result));
+        setError(errorMessage, describeCommandError(program(), arguments, result));
         return details;
     }
 
@@ -1031,18 +1083,29 @@ BwClient::CommandResult BwClient::run(const QStringList& arguments,
     int timeoutMs,
     const QProcessEnvironment& extraEnvironment) const
 {
+    QMutexLocker<QRecursiveMutex> commandLocker(&m_commandMutex);
+
     CommandResult result;
     QProcess process;
 
+    QString programSnapshot;
+    QString sessionSnapshot;
+    {
+        QMutexLocker<QMutex> stateLocker(&m_stateMutex);
+        programSnapshot = m_program;
+        sessionSnapshot = m_session;
+    }
+
     QProcessEnvironment environment = QProcessEnvironment::systemEnvironment();
-    if (!m_session.isEmpty())
-        environment.insert("BW_SESSION", m_session);
+    environment.remove("BW_SESSION");
+    if (!sessionSnapshot.isEmpty())
+        environment.insert("BW_SESSION", sessionSnapshot);
 
     for (const QString& name : extraEnvironment.keys())
         environment.insert(name, extraEnvironment.value(name));
 
     process.setProcessEnvironment(environment);
-    process.setProgram(m_program);
+    process.setProgram(programSnapshot);
     process.setArguments(arguments);
 
     process.start();

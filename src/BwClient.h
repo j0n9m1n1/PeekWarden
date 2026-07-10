@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QByteArray>
+#include <QMutex>
 #include <QProcessEnvironment>
 #include <QString>
 #include <QStringList>
@@ -79,7 +80,8 @@ public:
     bool ensureSession(QWidget* parent, QString* errorMessage = nullptr);
     bool login(QWidget* parent, QString* errorMessage = nullptr);
     bool unlock(QWidget* parent, QString* errorMessage = nullptr);
-    bool loginWithCredentials(const QString& email,
+    bool loginWithCredentials(const QString& serverUrl,
+        const QString& email,
         const QString& password,
         const QString& method,
         const QString& code,
@@ -123,6 +125,8 @@ private:
         int timeoutMs = 15000,
         const QProcessEnvironment& extraEnvironment = QProcessEnvironment()) const;
 
+    mutable QRecursiveMutex m_commandMutex;
+    mutable QMutex m_stateMutex;
     QString m_program;
     QString m_session;
 };

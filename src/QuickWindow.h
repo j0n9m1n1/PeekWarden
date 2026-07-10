@@ -49,6 +49,7 @@ private:
 
     struct PrepareResult
     {
+        quint64 generation = 0;
         bool available = false;
         BwClient::StatusInfo statusInfo;
         QString errorMessage;
@@ -56,6 +57,7 @@ private:
 
     struct AuthResult
     {
+        quint64 generation = 0;
         bool ok = false;
         bool loginMode = false;
         QString errorMessage;
@@ -70,6 +72,7 @@ private:
 
     struct ItemsResult
     {
+        quint64 generation = 0;
         QVector<VaultItem> items;
         QString errorMessage;
     };
@@ -124,7 +127,9 @@ private:
     void copyUsername(QListWidgetItem* item);
     void copyTotp(QListWidgetItem* item);
     void showItemDetails(QListWidgetItem* item);
-    void copyTextAndHide(const QString& text, bool clearAfterDelay);
+    void closeDetailWindows();
+    void copyToClipboard(const QString& text, bool sensitive);
+    void copyTextAndHide(const QString& text, bool sensitive);
     void setStatus(const QString& message);
     QListWidgetItem* currentItem() const;
     void moveToConfiguredPosition();
@@ -175,6 +180,8 @@ private:
     bool m_preloadingVault = false;
     bool m_quietItemLoad = false;
     bool m_syncing = false;
+    quint64 m_vaultGeneration = 0;
+    quint64 m_clipboardGeneration = 0;
     QElapsedTimer m_preservedSearchTimer;
     QString m_preservedSearchText;
     QString m_preservedItemId;
