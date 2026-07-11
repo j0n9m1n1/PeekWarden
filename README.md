@@ -98,7 +98,10 @@ git push origin v0.1.1
 The workflow creates a `PeekWarden-<tag>-win64.zip` package with `PeekWarden.exe`,
 Qt runtime DLLs from `windeployqt`, translations, `README.md`, and `LICENSE`, then
 attaches it to the GitHub Release. It can also be run manually from the Actions
-tab. Use a new version tag for each release.
+tab. To rebuild an existing tag after fixing the release workflow, run the
+workflow from `main` and enter that tag in the `release_tag` input. Leave
+`release_tag` empty for a build-only manual run. Use a new version tag for each
+source release.
 
 ## Usage
 

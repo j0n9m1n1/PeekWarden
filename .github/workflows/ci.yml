@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   windows-mingw:
-    name: Windows / Qt 6.11.1 / MinGW 13.1
+    name: Windows / Qt 6.10.3 / MinGW 13.1
     runs-on: windows-latest
 
     steps:
@@ -26,7 +26,8 @@ jobs:
       - name: Install Qt and MinGW
         uses: jurplel/install-qt-action@v4
         with:
-          version: 6.11.1
+          # aqtinstall 3.3 cannot resolve Qt 6.11's changed repository layout yet.
+          version: 6.10.3
           host: windows
           target: desktop
           arch: win64_mingw

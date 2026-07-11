@@ -3,10 +3,14 @@ name: Release
 on:
   workflow_dispatch:
     inputs:
+      release_tag:
+        description: Existing tag to build and publish (leave empty for build only)
+        required: false
+        type: string
       qt_version:
         description: Qt version to build with
         required: true
-        default: 6.11.1
+        default: 6.10.3
   push:
     tags:
       - "v*"
@@ -16,7 +20,8 @@ permissions:
 
 env:
   APP_NAME: PeekWarden
-  QT_VERSION: ${{ github.event.inputs.qt_version || '6.11.1' }}
+  # aqtinstall 3.3 cannot resolve Qt 6.11's changed repository layout yet.
+  QT_VERSION: ${{ github.event.inputs.qt_version || '6.10.3' }}
 
 jobs:
   windows:
@@ -26,6 +31,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.release_tag || github.ref }}
 
       - name: Install Qt
         uses: jurplel/install-qt-action@v4
@@ -78,8 +85,12 @@ jobs:
 
       - name: Package
         shell: pwsh
+        env:
+          REQUESTED_TAG: ${{ github.event.inputs.release_tag }}
+          SOURCE_REF_TYPE: ${{ github.ref_type }}
+          SOURCE_REF_NAME: ${{ github.ref_name }}
         run: |
-          $version = if ("${{ github.ref_type }}" -eq "tag") { "${{ github.ref_name }}" } else { "manual" }
+          $version = if ($env:REQUESTED_TAG) { $env:REQUESTED_TAG } elseif ($env:SOURCE_REF_TYPE -eq "tag") { $env:SOURCE_REF_NAME } else { "manual" }
           $stage = Join-Path $PWD "dist\${{ env.APP_NAME }}-$version-win64"
           $zip = "$stage.zip"
           $exeCandidates = @(
@@ -124,8 +135,9 @@ jobs:
           if-no-files-found: error
 
       - name: Publish GitHub Release
-        if: startsWith(github.ref, 'refs/tags/')
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
           files: ${{ env.PACKAGE_PATH }}
           generate_release_notes: true
